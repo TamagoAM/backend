@@ -1,0 +1,20 @@
+version: "3.9"
+services:
+  api:
+    build: .
+    ports:
+      - "8080:8080"
+    env_file:
+      - .env
+    depends_on:
+      - mysql
+  mysql:
+    image: mysql:8.4
+    environment:
+      MYSQL_DATABASE: tamago
+      MYSQL_USER: tamago
+      MYSQL_PASSWORD: tamago
+      MYSQL_ROOT_PASSWORD: root
+    ports:
+      - "3306:3306"
+    command: ["--default-authentication-plugin=mysql_native_password"]

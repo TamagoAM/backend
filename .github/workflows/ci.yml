@@ -1,0 +1,84 @@
+name: CI
+
+on:
+  push:
+    branches: ["main"]
+  pull_request:
+
+jobs:
+  write-env:
+    runs-on: ubuntu-latest
+    outputs:
+      artifact-name: env-file
+    steps:
+      - uses: actions/checkout@v4
+      - name: Create .env from repository secrets
+        run: |
+          touch ./.env
+          echo PORT = ${{ secrets.PORT }} >> ./.env
+          echo DB_HOST = ${{ secrets.DB_HOST }} >> ./.env
+          echo DB_PORT = ${{ secrets.DB_PORT }} >> ./.env
+          echo DB_NAME = ${{ secrets.DB_NAME }} >> ./.env
+          echo DB_USER = ${{ secrets.DB_USER }} >> ./.env
+          echo DB_PASS = ${{ secrets.DB_PASS }} >> ./.env
+          echo MIGRATE_ON_START = "false" >> ./.env
+          cat ./.env
+      - name: Show .env
+        run: |
+          ls -la
+          cat ./.env || true
+      - name: Upload .env artifact
+        uses: actions/upload-artifact@v4
+          
+        with:
+          name: env-file
+          path: ./.env
+          include-hidden-files: true
+  build:
+    needs: write-env
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Download .env artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: env-file
+          path: ./.env
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version: "1.22"
+
+      - name: Build
+        run: go build ./cmd/server
+
+  docker:
+    needs: [build, write-env]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Download .env artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: env-file
+          path: .
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to Docker Hub
+        uses: docker/login-action@v2
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - name: Build and push Docker image
+        uses: docker/build-push-action@v4
+        with:
+          context: .
+          push: true
+          tags: |
+            ${{ secrets.DOCKERHUB_USERNAME }}/tamagoam-api:${{ github.sha }}
+            ${{ secrets.DOCKERHUB_USERNAME }}/tamagoam-api:latest
