@@ -9,6 +9,7 @@ FROM gcr.io/distroless/static-debian12:nonroot
 WORKDIR /app
 COPY --from=build /app/bin/server /app/server
 COPY --from=build /app/migrations /app/migrations
+COPY --from=build /app/.env /app/.env
 ENV PORT=8080
 EXPOSE 8080
 USER nonroot:nonroot
