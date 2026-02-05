@@ -14,25 +14,25 @@ jobs:
       - uses: actions/checkout@v4
       - name: Create .env from repository secrets
         run: |
-          touch ./.env
-          echo PORT = ${{ secrets.PORT }} >> ./.env
-          echo DB_HOST = ${{ secrets.DB_HOST }} >> ./.env
-          echo DB_PORT = ${{ secrets.DB_PORT }} >> ./.env
-          echo DB_NAME = ${{ secrets.DB_NAME }} >> ./.env
-          echo DB_USER = ${{ secrets.DB_USER }} >> ./.env
-          echo DB_PASS = ${{ secrets.DB_PASS }} >> ./.env
-          echo MIGRATE_ON_START = "false" >> ./.env
-          cat ./.env
+          touch .env
+          echo PORT = ${{ secrets.PORT }} >> .env
+          echo DB_HOST = ${{ secrets.DB_HOST }} >> .env
+          echo DB_PORT = ${{ secrets.DB_PORT }} >> .env
+          echo DB_NAME = ${{ secrets.DB_NAME }} >> .env
+          echo DB_USER = ${{ secrets.DB_USER }} >> .env
+          echo DB_PASS = ${{ secrets.DB_PASS }} >> .env
+          echo MIGRATE_ON_START = "false" >> .env
+          cat .env
       - name: Show .env
         run: |
           ls -la
-          cat ./.env || true
+          cat .env || true
       - name: Upload .env artifact
         uses: actions/upload-artifact@v4
           
         with:
           name: env-file
-          path: ./.env
+          path: .env
           include-hidden-files: true
   build:
     needs: write-env
@@ -44,7 +44,7 @@ jobs:
         uses: actions/download-artifact@v4
         with:
           name: env-file
-          path: ./.env
+          path: .env
 
       - uses: actions/setup-go@v5
         with:
@@ -63,7 +63,7 @@ jobs:
         uses: actions/download-artifact@v4
         with:
           name: env-file
-          path: .
+          path: .env
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
