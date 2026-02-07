@@ -70,6 +70,13 @@ type Store interface {
 	CreateLifeChoice(ctx context.Context, input CreateLifeChoiceInput) (*models.LifeChoice, error)
 	UpdateLifeChoice(ctx context.Context, id int, input CreateLifeChoiceInput) (*models.LifeChoice, error)
 	DeleteLifeChoice(ctx context.Context, id int) (bool, error)
+
+	// User-scoped queries for user monitor
+	TamasByUser(ctx context.Context, userID int) ([]models.Tama, error)
+	FriendsByUser(ctx context.Context, userID int) ([]models.Friend, error)
+	SponsorsByUser(ctx context.Context, userID int) ([]models.Sponsor, error)
+	SponsoredByUser(ctx context.Context, userID int) ([]models.Sponsor, error)
+	TamaStatsByUser(ctx context.Context, userID int) ([]models.TamaStat, error)
 }
 
 type SQLStore struct {
@@ -598,4 +605,36 @@ func (s *SQLStore) DeleteLifeChoice(ctx context.Context, id int) (bool, error) {
 	}
 	rows, _ := res.RowsAffected()
 	return rows > 0, nil
+}
+
+// ─── User-scoped queries for user monitor ────────────────────────
+
+func (s *SQLStore) TamasByUser(ctx context.Context, userID int) ([]models.Tama, error) {
+	var tamas []models.Tama
+	err := s.db.SelectContext(ctx, &tamas, "SELECT * FROM Tama WHERE UserId = ? ORDER BY TamaId DESC", userID)
+	return tamas, err
+}
+
+func (s *SQLStore) FriendsByUser(ctx context.Context, userID int) ([]models.Friend, error) {
+	var friends []models.Friend
+	err := s.db.SelectContext(ctx, &friends, "SELECT * FROM Friends WHERE UserID = ? OR FriendID = ? ORDER BY DateBecameFriends DESC", userID, userID)
+	return friends, err
+}
+
+func (s *SQLStore) SponsorsByUser(ctx context.Context, userID int) ([]models.Sponsor, error) {
+	var sponsors []models.Sponsor
+	err := s.db.SelectContext(ctx, &sponsors, "SELECT * FROM Sponsor WHERE SponsorId = ? ORDER BY DateOfSponsor DESC", userID)
+	return sponsors, err
+}
+
+func (s *SQLStore) SponsoredByUser(ctx context.Context, userID int) ([]models.Sponsor, error) {
+	var sponsors []models.Sponsor
+	err := s.db.SelectContext(ctx, &sponsors, "SELECT * FROM Sponsor WHERE SponsoredId = ? ORDER BY DateOfSponsor DESC", userID)
+	return sponsors, err
+}
+
+func (s *SQLStore) TamaStatsByUser(ctx context.Context, userID int) ([]models.TamaStat, error) {
+	var stats []models.TamaStat
+	err := s.db.SelectContext(ctx, &stats, "SELECT ts.* FROM Tama_stats ts INNER JOIN Tama t ON t.TamaStatsID = ts.TamaStatId WHERE t.UserId = ? ORDER BY ts.TamaStatId DESC", userID)
+	return stats, err
 }

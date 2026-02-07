@@ -671,6 +671,58 @@ func NewSchema(db *sqlx.DB) (graphql.Schema, error) {
 					return store.ListLifeChoices(p.Context)
 				},
 			},
+
+			// ─── User-scoped queries for user monitor ─────────────
+			"tamasByUser": &graphql.Field{
+				Type: graphql.NewList(tamaType),
+				Args: graphql.FieldConfigArgument{
+					"userId": &graphql.ArgumentConfig{Type: graphql.NewNonNull(graphql.Int)},
+				},
+				Resolve: func(p graphql.ResolveParams) (interface{}, error) {
+					userID := p.Args["userId"].(int)
+					return store.TamasByUser(p.Context, userID)
+				},
+			},
+			"friendsByUser": &graphql.Field{
+				Type: graphql.NewList(friendType),
+				Args: graphql.FieldConfigArgument{
+					"userId": &graphql.ArgumentConfig{Type: graphql.NewNonNull(graphql.Int)},
+				},
+				Resolve: func(p graphql.ResolveParams) (interface{}, error) {
+					userID := p.Args["userId"].(int)
+					return store.FriendsByUser(p.Context, userID)
+				},
+			},
+			"sponsorsByUser": &graphql.Field{
+				Type: graphql.NewList(sponsorType),
+				Args: graphql.FieldConfigArgument{
+					"userId": &graphql.ArgumentConfig{Type: graphql.NewNonNull(graphql.Int)},
+				},
+				Resolve: func(p graphql.ResolveParams) (interface{}, error) {
+					userID := p.Args["userId"].(int)
+					return store.SponsorsByUser(p.Context, userID)
+				},
+			},
+			"sponsoredByUser": &graphql.Field{
+				Type: graphql.NewList(sponsorType),
+				Args: graphql.FieldConfigArgument{
+					"userId": &graphql.ArgumentConfig{Type: graphql.NewNonNull(graphql.Int)},
+				},
+				Resolve: func(p graphql.ResolveParams) (interface{}, error) {
+					userID := p.Args["userId"].(int)
+					return store.SponsoredByUser(p.Context, userID)
+				},
+			},
+			"tamaStatsByUser": &graphql.Field{
+				Type: graphql.NewList(tamaStatType),
+				Args: graphql.FieldConfigArgument{
+					"userId": &graphql.ArgumentConfig{Type: graphql.NewNonNull(graphql.Int)},
+				},
+				Resolve: func(p graphql.ResolveParams) (interface{}, error) {
+					userID := p.Args["userId"].(int)
+					return store.TamaStatsByUser(p.Context, userID)
+				},
+			},
 		},
 	})
 
