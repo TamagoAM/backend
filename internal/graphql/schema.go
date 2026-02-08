@@ -7,6 +7,7 @@ import (
 	"github.com/graphql-go/graphql"
 	"github.com/jmoiron/sqlx"
 
+	"tamagoam/internal/auth"
 	"tamagoam/internal/models"
 )
 
@@ -15,6 +16,9 @@ type CreateUserInput struct {
 	LastName           string
 	UserName           string
 	Email              string
+	PasswordHash       string
+	ClearanceLevel     int
+	Verified           bool
 	ProfilPicture      *string
 	GamingTime         int
 	LastConnectionDate *time.Time
@@ -136,6 +140,18 @@ func NewSchema(db *sqlx.DB) (graphql.Schema, error) {
 			"email": &graphql.Field{Type: graphql.String, Resolve: func(p graphql.ResolveParams) (interface{}, error) {
 				if u, ok := p.Source.(models.User); ok {
 					return u.Email, nil
+				}
+				return nil, nil
+			}},
+			"clearanceLevel": &graphql.Field{Type: graphql.Int, Resolve: func(p graphql.ResolveParams) (interface{}, error) {
+				if u, ok := p.Source.(models.User); ok {
+					return u.ClearanceLevel, nil
+				}
+				return nil, nil
+			}},
+			"verified": &graphql.Field{Type: graphql.Boolean, Resolve: func(p graphql.ResolveParams) (interface{}, error) {
+				if u, ok := p.Source.(models.User); ok {
+					return u.Verified, nil
 				}
 				return nil, nil
 			}},
@@ -733,6 +749,9 @@ func NewSchema(db *sqlx.DB) (graphql.Schema, error) {
 			"lastName":           &graphql.InputObjectFieldConfig{Type: graphql.NewNonNull(graphql.String)},
 			"userName":           &graphql.InputObjectFieldConfig{Type: graphql.NewNonNull(graphql.String)},
 			"email":              &graphql.InputObjectFieldConfig{Type: graphql.NewNonNull(graphql.String)},
+			"password":           &graphql.InputObjectFieldConfig{Type: graphql.String},
+			"clearanceLevel":     &graphql.InputObjectFieldConfig{Type: graphql.Int},
+			"verified":           &graphql.InputObjectFieldConfig{Type: graphql.Boolean},
 			"profilPicture":      &graphql.InputObjectFieldConfig{Type: graphql.String},
 			"gamingTime":         &graphql.InputObjectFieldConfig{Type: graphql.Int},
 			"lastConnectionDate": &graphql.InputObjectFieldConfig{Type: graphql.String},
@@ -871,6 +890,25 @@ func NewSchema(db *sqlx.DB) (graphql.Schema, error) {
 						UserName: inputMap["userName"].(string),
 						Email:    inputMap["email"].(string),
 					}
+					if v, ok := inputMap["password"]; ok {
+						if s, ok := v.(string); ok && s != "" {
+							hashed, err := auth.HashPassword(s)
+							if err != nil {
+								return nil, err
+							}
+							input.PasswordHash = hashed
+						}
+					}
+					if v, ok := inputMap["clearanceLevel"]; ok {
+						if i, ok := v.(int); ok {
+							input.ClearanceLevel = i
+						}
+					}
+					if v, ok := inputMap["verified"]; ok {
+						if b, ok := v.(bool); ok {
+							input.Verified = b
+						}
+					}
 					if v, ok := inputMap["profilPicture"]; ok {
 						if s, ok := v.(string); ok {
 							input.ProfilPicture = &s
@@ -905,6 +943,32 @@ func NewSchema(db *sqlx.DB) (graphql.Schema, error) {
 						LastName: inputMap["lastName"].(string),
 						UserName: inputMap["userName"].(string),
 						Email:    inputMap["email"].(string),
+					}
+					if v, ok := inputMap["password"]; ok {
+						if s, ok := v.(string); ok && s != "" {
+							hashed, err := auth.HashPassword(s)
+							if err != nil {
+								return nil, err
+							}
+							input.PasswordHash = hashed
+						}
+					}
+					// If no password provided on update, preserve existing hash
+					if input.PasswordHash == "" {
+						existing, err := store.GetUser(p.Context, id)
+						if err == nil && existing != nil {
+							input.PasswordHash = existing.PasswordHash
+						}
+					}
+					if v, ok := inputMap["clearanceLevel"]; ok {
+						if i, ok := v.(int); ok {
+							input.ClearanceLevel = i
+						}
+					}
+					if v, ok := inputMap["verified"]; ok {
+						if b, ok := v.(bool); ok {
+							input.Verified = b
+						}
 					}
 					if v, ok := inputMap["profilPicture"]; ok {
 						if s, ok := v.(string); ok {

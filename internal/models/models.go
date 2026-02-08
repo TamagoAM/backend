@@ -8,6 +8,9 @@ type User struct {
 	LastName           string     `db:"LastName"`
 	UserName           string     `db:"UserName"`
 	Email              string     `db:"Email"`
+	PasswordHash       string     `db:"PasswordHash"`
+	ClearanceLevel     int        `db:"ClearanceLevel"`
+	Verified           bool       `db:"Verified"`
 	ProfilPicture      *string    `db:"ProfilPicture"`
 	GamingTime         int        `db:"GamingTime"`
 	CreationDate       time.Time  `db:"CreationDate"`

@@ -14,6 +14,7 @@ type Config struct {
 	DBName         string
 	DBUser         string
 	DBPass         string
+	JWTSecret      string
 	MigrateOnStart bool
 }
 
@@ -52,6 +53,11 @@ func Load() Config {
 	dbPass := os.Getenv("DB_PASS")
 	// dbPass may be empty; keep as-is
 
+	jwtSecret := os.Getenv("JWT_SECRET")
+	if jwtSecret == "" {
+		jwtSecret = "tamagoam-dev-secret-change-in-production"
+	}
+
 	migrate := false
 	m := os.Getenv("MIGRATE_ON_START")
 	if m != "" {
@@ -68,6 +74,7 @@ func Load() Config {
 		DBName:         dbName,
 		DBUser:         dbUser,
 		DBPass:         dbPass,
+		JWTSecret:      jwtSecret,
 		MigrateOnStart: migrate,
 	}
 }

@@ -1,0 +1,5 @@
+-- Add authentication fields to Users table
+ALTER TABLE Users
+    ADD COLUMN IF NOT EXISTS PasswordHash VARCHAR(255) NOT NULL DEFAULT '' AFTER Email,
+    ADD COLUMN IF NOT EXISTS ClearanceLevel INT NOT NULL DEFAULT 0 AFTER PasswordHash,
+    ADD COLUMN IF NOT EXISTS Verified BOOLEAN NOT NULL DEFAULT FALSE AFTER ClearanceLevel;

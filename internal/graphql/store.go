@@ -12,6 +12,8 @@ import (
 type Store interface {
 	ListUsers(ctx context.Context) ([]models.User, error)
 	GetUser(ctx context.Context, id int) (*models.User, error)
+	GetUserByEmail(ctx context.Context, email string) (*models.User, error)
+	GetUserByUserName(ctx context.Context, userName string) (*models.User, error)
 	CreateUser(ctx context.Context, input CreateUserInput) (*models.User, error)
 	UpdateUser(ctx context.Context, id int, input CreateUserInput) (*models.User, error)
 	DeleteUser(ctx context.Context, id int) (bool, error)
@@ -102,8 +104,26 @@ func (s *SQLStore) GetUser(ctx context.Context, id int) (*models.User, error) {
 	return &user, nil
 }
 
+func (s *SQLStore) GetUserByEmail(ctx context.Context, email string) (*models.User, error) {
+	var user models.User
+	err := s.db.GetContext(ctx, &user, "SELECT * FROM Users WHERE Email = ?", email)
+	if err != nil {
+		return nil, err
+	}
+	return &user, nil
+}
+
+func (s *SQLStore) GetUserByUserName(ctx context.Context, userName string) (*models.User, error) {
+	var user models.User
+	err := s.db.GetContext(ctx, &user, "SELECT * FROM Users WHERE UserName = ?", userName)
+	if err != nil {
+		return nil, err
+	}
+	return &user, nil
+}
+
 func (s *SQLStore) CreateUser(ctx context.Context, input CreateUserInput) (*models.User, error) {
-	res, err := s.db.ExecContext(ctx, `INSERT INTO Users (Name, LastName, UserName, Email, ProfilPicture, GamingTime, LastConnectionDate) VALUES (?, ?, ?, ?, ?, ?, ?)`, input.Name, input.LastName, input.UserName, input.Email, input.ProfilPicture, input.GamingTime, input.LastConnectionDate)
+	res, err := s.db.ExecContext(ctx, `INSERT INTO Users (Name, LastName, UserName, Email, PasswordHash, ClearanceLevel, Verified, ProfilPicture, GamingTime, LastConnectionDate) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`, input.Name, input.LastName, input.UserName, input.Email, input.PasswordHash, input.ClearanceLevel, input.Verified, input.ProfilPicture, input.GamingTime, input.LastConnectionDate)
 	if err != nil {
 		return nil, err
 	}
@@ -115,7 +135,7 @@ func (s *SQLStore) CreateUser(ctx context.Context, input CreateUserInput) (*mode
 }
 
 func (s *SQLStore) UpdateUser(ctx context.Context, id int, input CreateUserInput) (*models.User, error) {
-	_, err := s.db.ExecContext(ctx, `UPDATE Users SET Name = ?, LastName = ?, UserName = ?, Email = ?, ProfilPicture = ?, GamingTime = ?, LastConnectionDate = ? WHERE UserId = ?`, input.Name, input.LastName, input.UserName, input.Email, input.ProfilPicture, input.GamingTime, input.LastConnectionDate, id)
+	_, err := s.db.ExecContext(ctx, `UPDATE Users SET Name = ?, LastName = ?, UserName = ?, Email = ?, PasswordHash = ?, ClearanceLevel = ?, Verified = ?, ProfilPicture = ?, GamingTime = ?, LastConnectionDate = ? WHERE UserId = ?`, input.Name, input.LastName, input.UserName, input.Email, input.PasswordHash, input.ClearanceLevel, input.Verified, input.ProfilPicture, input.GamingTime, input.LastConnectionDate, id)
 	if err != nil {
 		return nil, err
 	}
