@@ -1,4 +1,25 @@
-CREATE TABLE IF NOT EXISTS Users (
+-- ═══════════════════════════════════════════════════
+-- Drop all tables in reverse dependency order
+-- so foreign keys don't block the drops.
+-- ═══════════════════════════════════════════════════
+DROP TABLE IF EXISTS LifeChoices;
+DROP TABLE IF EXISTS Event;
+DROP TABLE IF EXISTS Malus;
+DROP TABLE IF EXISTS Bonus;
+DROP TABLE IF EXISTS Trait;
+DROP TABLE IF EXISTS Sickness;
+DROP TABLE IF EXISTS Sponsor;
+DROP TABLE IF EXISTS Friends;
+DROP TABLE IF EXISTS Tama;
+DROP TABLE IF EXISTS Tama_stats;
+DROP TABLE IF EXISTS Race;
+DROP TABLE IF EXISTS Users;
+
+-- ═══════════════════════════════════════════════════
+-- Recreate everything from scratch
+-- ═══════════════════════════════════════════════════
+
+CREATE TABLE Users (
     UserId INT NOT NULL AUTO_INCREMENT,
     Name VARCHAR(100) NOT NULL,
     LastName VARCHAR(100) NOT NULL,
@@ -16,7 +37,7 @@ CREATE TABLE IF NOT EXISTS Users (
     INDEX idx_email (Email)
 ) ENGINE=InnoDB;
 
-CREATE TABLE IF NOT EXISTS Race (
+CREATE TABLE Race (
     RaceId INT NOT NULL AUTO_INCREMENT,
     Name VARCHAR(100) UNIQUE NOT NULL,
     `Desc` TEXT,
@@ -26,7 +47,7 @@ CREATE TABLE IF NOT EXISTS Race (
     INDEX idx_name (Name)
 ) ENGINE=InnoDB;
 
-CREATE TABLE Tama_stats (
+CREATE TABLE IF Tama_stats (
     TamaStatId INT NOT NULL AUTO_INCREMENT,
     Fed INT DEFAULT 0,
     LastFed DATETIME,
@@ -48,7 +69,7 @@ CREATE TABLE Tama_stats (
     PRIMARY KEY (TamaStatId)
 ) ENGINE=InnoDB;
 
-CREATE TABLE IF NOT EXISTS Tama (
+CREATE TABLE Tama (
     TamaId INT NOT NULL AUTO_INCREMENT,
     UserId INT NOT NULL,
     TamaStatsID INT NOT NULL,
@@ -68,7 +89,7 @@ CREATE TABLE IF NOT EXISTS Tama (
     INDEX idx_race (Race)
 ) ENGINE=InnoDB;
 
-CREATE TABLE IF NOT EXISTS Friends (
+CREATE TABLE Friends (
     UserID INT NOT NULL,
     FriendID INT NOT NULL,
     DateBecameFriends DATE NOT NULL DEFAULT (CURRENT_DATE),
@@ -79,7 +100,7 @@ CREATE TABLE IF NOT EXISTS Friends (
     INDEX idx_friendid (FriendID)
 ) ENGINE=InnoDB;
 
-CREATE TABLE IF NOT EXISTS Sponsor (
+CREATE TABLE Sponsor (
     SponsorId INT NOT NULL,
     SponsoredId INT NOT NULL,
     DateOfSponsor DATE NOT NULL DEFAULT (CURRENT_DATE),
@@ -90,7 +111,7 @@ CREATE TABLE IF NOT EXISTS Sponsor (
     INDEX idx_sponsoredid (SponsoredId)
 ) ENGINE=InnoDB;
 
-CREATE TABLE IF NOT EXISTS Sickness (
+CREATE TABLE Sickness (
     SicknessId INT NOT NULL AUTO_INCREMENT,
     Name VARCHAR(100) NOT NULL,
     `Desc` TEXT,
@@ -101,7 +122,7 @@ CREATE TABLE IF NOT EXISTS Sickness (
     INDEX idx_name (Name)
 ) ENGINE=InnoDB;
 
-CREATE TABLE IF NOT EXISTS Trait (
+CREATE TABLE Trait (
     TraitId INT NOT NULL AUTO_INCREMENT,
     Name VARCHAR(100) NOT NULL,
     `Desc` TEXT,
@@ -111,7 +132,7 @@ CREATE TABLE IF NOT EXISTS Trait (
     INDEX idx_name (Name)
 ) ENGINE=InnoDB;
 
-CREATE TABLE IF NOT EXISTS Bonus (
+CREATE TABLE Bonus (
     BonusId INT NOT NULL AUTO_INCREMENT,
     Name VARCHAR(100) NOT NULL,
     `Desc` TEXT,
@@ -120,7 +141,7 @@ CREATE TABLE IF NOT EXISTS Bonus (
     INDEX idx_name (Name)
 ) ENGINE=InnoDB;
 
-CREATE TABLE IF NOT EXISTS Malus (
+CREATE TABLE Malus (
     MalusId INT NOT NULL AUTO_INCREMENT,
     Name VARCHAR(100) NOT NULL,
     `Desc` TEXT,
@@ -129,7 +150,7 @@ CREATE TABLE IF NOT EXISTS Malus (
     INDEX idx_name (Name)
 ) ENGINE=InnoDB;
 
-CREATE TABLE IF NOT EXISTS Event (
+CREATE TABLE Event (
     EventId INT NOT NULL AUTO_INCREMENT,
     Name VARCHAR(100) NOT NULL,
     `Desc` TEXT,
@@ -139,7 +160,7 @@ CREATE TABLE IF NOT EXISTS Event (
     INDEX idx_name (Name)
 ) ENGINE=InnoDB;
 
-CREATE TABLE IF NOT EXISTS LifeChoices (
+CREATE TABLE LifeChoices (
     LifeChoicesId INT NOT NULL AUTO_INCREMENT,
     Name VARCHAR(100) NOT NULL,
     `Desc` TEXT,
