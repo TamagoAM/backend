@@ -107,6 +107,21 @@ type CreateLifeChoiceInput struct {
 	Traits *string
 }
 
+// sourceAs extracts the concrete value from p.Source whether it was passed
+// as a value (T) or a pointer (*T).  This is needed because graphql-go
+// passes list-element sources as values but single-record resolver returns
+// as pointers.
+func sourceAs[T any](src interface{}) (T, bool) {
+	if v, ok := src.(T); ok {
+		return v, true
+	}
+	if p, ok := src.(*T); ok && p != nil {
+		return *p, true
+	}
+	var zero T
+	return zero, false
+}
+
 func NewSchema(db *sqlx.DB) (graphql.Schema, error) {
 	store := NewSQLStore(db)
 
@@ -114,67 +129,67 @@ func NewSchema(db *sqlx.DB) (graphql.Schema, error) {
 		Name: "User",
 		Fields: graphql.Fields{
 			"id": &graphql.Field{Type: graphql.Int, Resolve: func(p graphql.ResolveParams) (interface{}, error) {
-				if u, ok := p.Source.(models.User); ok {
+				if u, ok := sourceAs[models.User](p.Source); ok {
 					return u.UserID, nil
 				}
 				return nil, nil
 			}},
 			"name": &graphql.Field{Type: graphql.String, Resolve: func(p graphql.ResolveParams) (interface{}, error) {
-				if u, ok := p.Source.(models.User); ok {
+				if u, ok := sourceAs[models.User](p.Source); ok {
 					return u.Name, nil
 				}
 				return nil, nil
 			}},
 			"lastName": &graphql.Field{Type: graphql.String, Resolve: func(p graphql.ResolveParams) (interface{}, error) {
-				if u, ok := p.Source.(models.User); ok {
+				if u, ok := sourceAs[models.User](p.Source); ok {
 					return u.LastName, nil
 				}
 				return nil, nil
 			}},
 			"userName": &graphql.Field{Type: graphql.String, Resolve: func(p graphql.ResolveParams) (interface{}, error) {
-				if u, ok := p.Source.(models.User); ok {
+				if u, ok := sourceAs[models.User](p.Source); ok {
 					return u.UserName, nil
 				}
 				return nil, nil
 			}},
 			"email": &graphql.Field{Type: graphql.String, Resolve: func(p graphql.ResolveParams) (interface{}, error) {
-				if u, ok := p.Source.(models.User); ok {
+				if u, ok := sourceAs[models.User](p.Source); ok {
 					return u.Email, nil
 				}
 				return nil, nil
 			}},
 			"clearanceLevel": &graphql.Field{Type: graphql.Int, Resolve: func(p graphql.ResolveParams) (interface{}, error) {
-				if u, ok := p.Source.(models.User); ok {
+				if u, ok := sourceAs[models.User](p.Source); ok {
 					return u.ClearanceLevel, nil
 				}
 				return nil, nil
 			}},
 			"verified": &graphql.Field{Type: graphql.Boolean, Resolve: func(p graphql.ResolveParams) (interface{}, error) {
-				if u, ok := p.Source.(models.User); ok {
+				if u, ok := sourceAs[models.User](p.Source); ok {
 					return u.Verified, nil
 				}
 				return nil, nil
 			}},
 			"profilPicture": &graphql.Field{Type: graphql.String, Resolve: func(p graphql.ResolveParams) (interface{}, error) {
-				if u, ok := p.Source.(models.User); ok {
+				if u, ok := sourceAs[models.User](p.Source); ok {
 					return u.ProfilPicture, nil
 				}
 				return nil, nil
 			}},
 			"gamingTime": &graphql.Field{Type: graphql.Int, Resolve: func(p graphql.ResolveParams) (interface{}, error) {
-				if u, ok := p.Source.(models.User); ok {
+				if u, ok := sourceAs[models.User](p.Source); ok {
 					return u.GamingTime, nil
 				}
 				return nil, nil
 			}},
 			"creationDate": &graphql.Field{Type: graphql.String, Resolve: func(p graphql.ResolveParams) (interface{}, error) {
-				if u, ok := p.Source.(models.User); ok {
+				if u, ok := sourceAs[models.User](p.Source); ok {
 					return formatTimeValue(&u.CreationDate), nil
 				}
 				return nil, nil
 			}},
 			"lastConnectionDate": &graphql.Field{Type: graphql.String, Resolve: func(p graphql.ResolveParams) (interface{}, error) {
-				if u, ok := p.Source.(models.User); ok {
+				if u, ok := sourceAs[models.User](p.Source); ok {
 					return formatTimeValue(u.LastConnectionDate), nil
 				}
 				return nil, nil
@@ -186,31 +201,31 @@ func NewSchema(db *sqlx.DB) (graphql.Schema, error) {
 		Name: "Race",
 		Fields: graphql.Fields{
 			"id": &graphql.Field{Type: graphql.Int, Resolve: func(p graphql.ResolveParams) (interface{}, error) {
-				if r, ok := p.Source.(models.Race); ok {
+				if r, ok := sourceAs[models.Race](p.Source); ok {
 					return r.RaceID, nil
 				}
 				return nil, nil
 			}},
 			"name": &graphql.Field{Type: graphql.String, Resolve: func(p graphql.ResolveParams) (interface{}, error) {
-				if r, ok := p.Source.(models.Race); ok {
+				if r, ok := sourceAs[models.Race](p.Source); ok {
 					return r.Name, nil
 				}
 				return nil, nil
 			}},
 			"desc": &graphql.Field{Type: graphql.String, Resolve: func(p graphql.ResolveParams) (interface{}, error) {
-				if r, ok := p.Source.(models.Race); ok {
+				if r, ok := sourceAs[models.Race](p.Source); ok {
 					return r.Desc, nil
 				}
 				return nil, nil
 			}},
 			"bonus": &graphql.Field{Type: graphql.String, Resolve: func(p graphql.ResolveParams) (interface{}, error) {
-				if r, ok := p.Source.(models.Race); ok {
+				if r, ok := sourceAs[models.Race](p.Source); ok {
 					return r.Bonus, nil
 				}
 				return nil, nil
 			}},
 			"malus": &graphql.Field{Type: graphql.String, Resolve: func(p graphql.ResolveParams) (interface{}, error) {
-				if r, ok := p.Source.(models.Race); ok {
+				if r, ok := sourceAs[models.Race](p.Source); ok {
 					return r.Malus, nil
 				}
 				return nil, nil
@@ -222,55 +237,55 @@ func NewSchema(db *sqlx.DB) (graphql.Schema, error) {
 		Name: "TamaStat",
 		Fields: graphql.Fields{
 			"id": &graphql.Field{Type: graphql.Int, Resolve: func(p graphql.ResolveParams) (interface{}, error) {
-				if s, ok := p.Source.(models.TamaStat); ok {
+				if s, ok := sourceAs[models.TamaStat](p.Source); ok {
 					return s.TamaStatID, nil
 				}
 				return nil, nil
 			}},
 			"food": &graphql.Field{Type: graphql.Int, Resolve: func(p graphql.ResolveParams) (interface{}, error) {
-				if s, ok := p.Source.(models.TamaStat); ok {
+				if s, ok := sourceAs[models.TamaStat](p.Source); ok {
 					return s.Food, nil
 				}
 				return nil, nil
 			}},
 			"play": &graphql.Field{Type: graphql.Int, Resolve: func(p graphql.ResolveParams) (interface{}, error) {
-				if s, ok := p.Source.(models.TamaStat); ok {
+				if s, ok := sourceAs[models.TamaStat](p.Source); ok {
 					return s.Play, nil
 				}
 				return nil, nil
 			}},
 			"cleaned": &graphql.Field{Type: graphql.Int, Resolve: func(p graphql.ResolveParams) (interface{}, error) {
-				if s, ok := p.Source.(models.TamaStat); ok {
+				if s, ok := sourceAs[models.TamaStat](p.Source); ok {
 					return s.Cleaned, nil
 				}
 				return nil, nil
 			}},
 			"carAccident": &graphql.Field{Type: graphql.Int, Resolve: func(p graphql.ResolveParams) (interface{}, error) {
-				if s, ok := p.Source.(models.TamaStat); ok {
+				if s, ok := sourceAs[models.TamaStat](p.Source); ok {
 					return s.CarAccident, nil
 				}
 				return nil, nil
 			}},
 			"workAccident": &graphql.Field{Type: graphql.Int, Resolve: func(p graphql.ResolveParams) (interface{}, error) {
-				if s, ok := p.Source.(models.TamaStat); ok {
+				if s, ok := sourceAs[models.TamaStat](p.Source); ok {
 					return s.WorkAccident, nil
 				}
 				return nil, nil
 			}},
 			"socialSatis": &graphql.Field{Type: graphql.Float, Resolve: func(p graphql.ResolveParams) (interface{}, error) {
-				if s, ok := p.Source.(models.TamaStat); ok {
+				if s, ok := sourceAs[models.TamaStat](p.Source); ok {
 					return s.SocialSatis, nil
 				}
 				return nil, nil
 			}},
 			"workSatis": &graphql.Field{Type: graphql.Float, Resolve: func(p graphql.ResolveParams) (interface{}, error) {
-				if s, ok := p.Source.(models.TamaStat); ok {
+				if s, ok := sourceAs[models.TamaStat](p.Source); ok {
 					return s.WorkSatis, nil
 				}
 				return nil, nil
 			}},
 			"personalSatis": &graphql.Field{Type: graphql.Float, Resolve: func(p graphql.ResolveParams) (interface{}, error) {
-				if s, ok := p.Source.(models.TamaStat); ok {
+				if s, ok := sourceAs[models.TamaStat](p.Source); ok {
 					return s.PersonalSatis, nil
 				}
 				return nil, nil
@@ -282,67 +297,67 @@ func NewSchema(db *sqlx.DB) (graphql.Schema, error) {
 		Name: "Tama",
 		Fields: graphql.Fields{
 			"id": &graphql.Field{Type: graphql.Int, Resolve: func(p graphql.ResolveParams) (interface{}, error) {
-				if t, ok := p.Source.(models.Tama); ok {
+				if t, ok := sourceAs[models.Tama](p.Source); ok {
 					return t.TamaID, nil
 				}
 				return nil, nil
 			}},
 			"userId": &graphql.Field{Type: graphql.Int, Resolve: func(p graphql.ResolveParams) (interface{}, error) {
-				if t, ok := p.Source.(models.Tama); ok {
+				if t, ok := sourceAs[models.Tama](p.Source); ok {
 					return t.UserID, nil
 				}
 				return nil, nil
 			}},
 			"tamaStatsId": &graphql.Field{Type: graphql.Int, Resolve: func(p graphql.ResolveParams) (interface{}, error) {
-				if t, ok := p.Source.(models.Tama); ok {
+				if t, ok := sourceAs[models.Tama](p.Source); ok {
 					return t.TamaStatsID, nil
 				}
 				return nil, nil
 			}},
 			"name": &graphql.Field{Type: graphql.String, Resolve: func(p graphql.ResolveParams) (interface{}, error) {
-				if t, ok := p.Source.(models.Tama); ok {
+				if t, ok := sourceAs[models.Tama](p.Source); ok {
 					return t.Name, nil
 				}
 				return nil, nil
 			}},
 			"sexe": &graphql.Field{Type: graphql.Boolean, Resolve: func(p graphql.ResolveParams) (interface{}, error) {
-				if t, ok := p.Source.(models.Tama); ok {
+				if t, ok := sourceAs[models.Tama](p.Source); ok {
 					return t.Sexe, nil
 				}
 				return nil, nil
 			}},
 			"race": &graphql.Field{Type: graphql.String, Resolve: func(p graphql.ResolveParams) (interface{}, error) {
-				if t, ok := p.Source.(models.Tama); ok {
+				if t, ok := sourceAs[models.Tama](p.Source); ok {
 					return t.Race, nil
 				}
 				return nil, nil
 			}},
 			"sickness": &graphql.Field{Type: graphql.String, Resolve: func(p graphql.ResolveParams) (interface{}, error) {
-				if t, ok := p.Source.(models.Tama); ok {
+				if t, ok := sourceAs[models.Tama](p.Source); ok {
 					return t.Sickness, nil
 				}
 				return nil, nil
 			}},
 			"birthday": &graphql.Field{Type: graphql.String, Resolve: func(p graphql.ResolveParams) (interface{}, error) {
-				if t, ok := p.Source.(models.Tama); ok {
+				if t, ok := sourceAs[models.Tama](p.Source); ok {
 					return formatDateValue(t.Birthday), nil
 				}
 				return nil, nil
 			}},
 			"deathDay": &graphql.Field{Type: graphql.String, Resolve: func(p graphql.ResolveParams) (interface{}, error) {
-				if t, ok := p.Source.(models.Tama); ok {
+				if t, ok := sourceAs[models.Tama](p.Source); ok {
 					return formatDateValue(t.DeathDay), nil
 				}
 				return nil, nil
 			}},
 			"causeOfDeath": &graphql.Field{Type: graphql.String, Resolve: func(p graphql.ResolveParams) (interface{}, error) {
-				if t, ok := p.Source.(models.Tama); ok {
+				if t, ok := sourceAs[models.Tama](p.Source); ok {
 					return t.CauseOfDeath, nil
 				}
 				return nil, nil
 			}},
 			"traits": &graphql.Field{Type: graphql.String, Resolve: func(p graphql.ResolveParams) (interface{}, error) {
-				if t, ok := p.Source.(models.Tama); ok {
+				if t, ok := sourceAs[models.Tama](p.Source); ok {
 					return t.Traits, nil
 				}
 				return nil, nil
@@ -354,19 +369,19 @@ func NewSchema(db *sqlx.DB) (graphql.Schema, error) {
 		Name: "Friend",
 		Fields: graphql.Fields{
 			"userId": &graphql.Field{Type: graphql.Int, Resolve: func(p graphql.ResolveParams) (interface{}, error) {
-				if f, ok := p.Source.(models.Friend); ok {
+				if f, ok := sourceAs[models.Friend](p.Source); ok {
 					return f.UserID, nil
 				}
 				return nil, nil
 			}},
 			"friendId": &graphql.Field{Type: graphql.Int, Resolve: func(p graphql.ResolveParams) (interface{}, error) {
-				if f, ok := p.Source.(models.Friend); ok {
+				if f, ok := sourceAs[models.Friend](p.Source); ok {
 					return f.FriendID, nil
 				}
 				return nil, nil
 			}},
 			"dateBecameFriends": &graphql.Field{Type: graphql.String, Resolve: func(p graphql.ResolveParams) (interface{}, error) {
-				if f, ok := p.Source.(models.Friend); ok {
+				if f, ok := sourceAs[models.Friend](p.Source); ok {
 					return formatDateValue(&f.DateBecameFriends), nil
 				}
 				return nil, nil
@@ -378,19 +393,19 @@ func NewSchema(db *sqlx.DB) (graphql.Schema, error) {
 		Name: "Sponsor",
 		Fields: graphql.Fields{
 			"sponsorId": &graphql.Field{Type: graphql.Int, Resolve: func(p graphql.ResolveParams) (interface{}, error) {
-				if s, ok := p.Source.(models.Sponsor); ok {
+				if s, ok := sourceAs[models.Sponsor](p.Source); ok {
 					return s.SponsorID, nil
 				}
 				return nil, nil
 			}},
 			"sponsoredId": &graphql.Field{Type: graphql.Int, Resolve: func(p graphql.ResolveParams) (interface{}, error) {
-				if s, ok := p.Source.(models.Sponsor); ok {
+				if s, ok := sourceAs[models.Sponsor](p.Source); ok {
 					return s.SponsoredID, nil
 				}
 				return nil, nil
 			}},
 			"dateOfSponsor": &graphql.Field{Type: graphql.String, Resolve: func(p graphql.ResolveParams) (interface{}, error) {
-				if s, ok := p.Source.(models.Sponsor); ok {
+				if s, ok := sourceAs[models.Sponsor](p.Source); ok {
 					return formatDateValue(&s.DateOfSponsor), nil
 				}
 				return nil, nil
@@ -402,37 +417,37 @@ func NewSchema(db *sqlx.DB) (graphql.Schema, error) {
 		Name: "Sickness",
 		Fields: graphql.Fields{
 			"id": &graphql.Field{Type: graphql.Int, Resolve: func(p graphql.ResolveParams) (interface{}, error) {
-				if s, ok := p.Source.(models.Sickness); ok {
+				if s, ok := sourceAs[models.Sickness](p.Source); ok {
 					return s.SicknessID, nil
 				}
 				return nil, nil
 			}},
 			"name": &graphql.Field{Type: graphql.String, Resolve: func(p graphql.ResolveParams) (interface{}, error) {
-				if s, ok := p.Source.(models.Sickness); ok {
+				if s, ok := sourceAs[models.Sickness](p.Source); ok {
 					return s.Name, nil
 				}
 				return nil, nil
 			}},
 			"desc": &graphql.Field{Type: graphql.String, Resolve: func(p graphql.ResolveParams) (interface{}, error) {
-				if s, ok := p.Source.(models.Sickness); ok {
+				if s, ok := sourceAs[models.Sickness](p.Source); ok {
 					return s.Desc, nil
 				}
 				return nil, nil
 			}},
 			"expirationDays": &graphql.Field{Type: graphql.Int, Resolve: func(p graphql.ResolveParams) (interface{}, error) {
-				if s, ok := p.Source.(models.Sickness); ok {
+				if s, ok := sourceAs[models.Sickness](p.Source); ok {
 					return s.ExpirationDays, nil
 				}
 				return nil, nil
 			}},
 			"bonus": &graphql.Field{Type: graphql.String, Resolve: func(p graphql.ResolveParams) (interface{}, error) {
-				if s, ok := p.Source.(models.Sickness); ok {
+				if s, ok := sourceAs[models.Sickness](p.Source); ok {
 					return s.Bonus, nil
 				}
 				return nil, nil
 			}},
 			"malus": &graphql.Field{Type: graphql.String, Resolve: func(p graphql.ResolveParams) (interface{}, error) {
-				if s, ok := p.Source.(models.Sickness); ok {
+				if s, ok := sourceAs[models.Sickness](p.Source); ok {
 					return s.Malus, nil
 				}
 				return nil, nil
@@ -444,31 +459,31 @@ func NewSchema(db *sqlx.DB) (graphql.Schema, error) {
 		Name: "Trait",
 		Fields: graphql.Fields{
 			"id": &graphql.Field{Type: graphql.Int, Resolve: func(p graphql.ResolveParams) (interface{}, error) {
-				if t, ok := p.Source.(models.Trait); ok {
+				if t, ok := sourceAs[models.Trait](p.Source); ok {
 					return t.TraitID, nil
 				}
 				return nil, nil
 			}},
 			"name": &graphql.Field{Type: graphql.String, Resolve: func(p graphql.ResolveParams) (interface{}, error) {
-				if t, ok := p.Source.(models.Trait); ok {
+				if t, ok := sourceAs[models.Trait](p.Source); ok {
 					return t.Name, nil
 				}
 				return nil, nil
 			}},
 			"desc": &graphql.Field{Type: graphql.String, Resolve: func(p graphql.ResolveParams) (interface{}, error) {
-				if t, ok := p.Source.(models.Trait); ok {
+				if t, ok := sourceAs[models.Trait](p.Source); ok {
 					return t.Desc, nil
 				}
 				return nil, nil
 			}},
 			"bonus": &graphql.Field{Type: graphql.String, Resolve: func(p graphql.ResolveParams) (interface{}, error) {
-				if t, ok := p.Source.(models.Trait); ok {
+				if t, ok := sourceAs[models.Trait](p.Source); ok {
 					return t.Bonus, nil
 				}
 				return nil, nil
 			}},
 			"malus": &graphql.Field{Type: graphql.String, Resolve: func(p graphql.ResolveParams) (interface{}, error) {
-				if t, ok := p.Source.(models.Trait); ok {
+				if t, ok := sourceAs[models.Trait](p.Source); ok {
 					return t.Malus, nil
 				}
 				return nil, nil
@@ -480,25 +495,25 @@ func NewSchema(db *sqlx.DB) (graphql.Schema, error) {
 		Name: "Bonus",
 		Fields: graphql.Fields{
 			"id": &graphql.Field{Type: graphql.Int, Resolve: func(p graphql.ResolveParams) (interface{}, error) {
-				if b, ok := p.Source.(models.Bonus); ok {
+				if b, ok := sourceAs[models.Bonus](p.Source); ok {
 					return b.BonusID, nil
 				}
 				return nil, nil
 			}},
 			"name": &graphql.Field{Type: graphql.String, Resolve: func(p graphql.ResolveParams) (interface{}, error) {
-				if b, ok := p.Source.(models.Bonus); ok {
+				if b, ok := sourceAs[models.Bonus](p.Source); ok {
 					return b.Name, nil
 				}
 				return nil, nil
 			}},
 			"desc": &graphql.Field{Type: graphql.String, Resolve: func(p graphql.ResolveParams) (interface{}, error) {
-				if b, ok := p.Source.(models.Bonus); ok {
+				if b, ok := sourceAs[models.Bonus](p.Source); ok {
 					return b.Desc, nil
 				}
 				return nil, nil
 			}},
 			"effet": &graphql.Field{Type: graphql.String, Resolve: func(p graphql.ResolveParams) (interface{}, error) {
-				if b, ok := p.Source.(models.Bonus); ok {
+				if b, ok := sourceAs[models.Bonus](p.Source); ok {
 					return b.Effet, nil
 				}
 				return nil, nil
@@ -510,25 +525,25 @@ func NewSchema(db *sqlx.DB) (graphql.Schema, error) {
 		Name: "Malus",
 		Fields: graphql.Fields{
 			"id": &graphql.Field{Type: graphql.Int, Resolve: func(p graphql.ResolveParams) (interface{}, error) {
-				if m, ok := p.Source.(models.Malus); ok {
+				if m, ok := sourceAs[models.Malus](p.Source); ok {
 					return m.MalusID, nil
 				}
 				return nil, nil
 			}},
 			"name": &graphql.Field{Type: graphql.String, Resolve: func(p graphql.ResolveParams) (interface{}, error) {
-				if m, ok := p.Source.(models.Malus); ok {
+				if m, ok := sourceAs[models.Malus](p.Source); ok {
 					return m.Name, nil
 				}
 				return nil, nil
 			}},
 			"desc": &graphql.Field{Type: graphql.String, Resolve: func(p graphql.ResolveParams) (interface{}, error) {
-				if m, ok := p.Source.(models.Malus); ok {
+				if m, ok := sourceAs[models.Malus](p.Source); ok {
 					return m.Desc, nil
 				}
 				return nil, nil
 			}},
 			"effet": &graphql.Field{Type: graphql.String, Resolve: func(p graphql.ResolveParams) (interface{}, error) {
-				if m, ok := p.Source.(models.Malus); ok {
+				if m, ok := sourceAs[models.Malus](p.Source); ok {
 					return m.Effet, nil
 				}
 				return nil, nil
@@ -540,31 +555,31 @@ func NewSchema(db *sqlx.DB) (graphql.Schema, error) {
 		Name: "Event",
 		Fields: graphql.Fields{
 			"id": &graphql.Field{Type: graphql.Int, Resolve: func(p graphql.ResolveParams) (interface{}, error) {
-				if e, ok := p.Source.(models.Event); ok {
+				if e, ok := sourceAs[models.Event](p.Source); ok {
 					return e.EventID, nil
 				}
 				return nil, nil
 			}},
 			"name": &graphql.Field{Type: graphql.String, Resolve: func(p graphql.ResolveParams) (interface{}, error) {
-				if e, ok := p.Source.(models.Event); ok {
+				if e, ok := sourceAs[models.Event](p.Source); ok {
 					return e.Name, nil
 				}
 				return nil, nil
 			}},
 			"desc": &graphql.Field{Type: graphql.String, Resolve: func(p graphql.ResolveParams) (interface{}, error) {
-				if e, ok := p.Source.(models.Event); ok {
+				if e, ok := sourceAs[models.Event](p.Source); ok {
 					return e.Desc, nil
 				}
 				return nil, nil
 			}},
 			"bonus": &graphql.Field{Type: graphql.String, Resolve: func(p graphql.ResolveParams) (interface{}, error) {
-				if e, ok := p.Source.(models.Event); ok {
+				if e, ok := sourceAs[models.Event](p.Source); ok {
 					return e.Bonus, nil
 				}
 				return nil, nil
 			}},
 			"malus": &graphql.Field{Type: graphql.String, Resolve: func(p graphql.ResolveParams) (interface{}, error) {
-				if e, ok := p.Source.(models.Event); ok {
+				if e, ok := sourceAs[models.Event](p.Source); ok {
 					return e.Malus, nil
 				}
 				return nil, nil
@@ -576,25 +591,25 @@ func NewSchema(db *sqlx.DB) (graphql.Schema, error) {
 		Name: "LifeChoice",
 		Fields: graphql.Fields{
 			"id": &graphql.Field{Type: graphql.Int, Resolve: func(p graphql.ResolveParams) (interface{}, error) {
-				if l, ok := p.Source.(models.LifeChoice); ok {
+				if l, ok := sourceAs[models.LifeChoice](p.Source); ok {
 					return l.LifeChoiceID, nil
 				}
 				return nil, nil
 			}},
 			"name": &graphql.Field{Type: graphql.String, Resolve: func(p graphql.ResolveParams) (interface{}, error) {
-				if l, ok := p.Source.(models.LifeChoice); ok {
+				if l, ok := sourceAs[models.LifeChoice](p.Source); ok {
 					return l.Name, nil
 				}
 				return nil, nil
 			}},
 			"desc": &graphql.Field{Type: graphql.String, Resolve: func(p graphql.ResolveParams) (interface{}, error) {
-				if l, ok := p.Source.(models.LifeChoice); ok {
+				if l, ok := sourceAs[models.LifeChoice](p.Source); ok {
 					return l.Desc, nil
 				}
 				return nil, nil
 			}},
 			"traits": &graphql.Field{Type: graphql.String, Resolve: func(p graphql.ResolveParams) (interface{}, error) {
-				if l, ok := p.Source.(models.LifeChoice); ok {
+				if l, ok := sourceAs[models.LifeChoice](p.Source); ok {
 					return l.Traits, nil
 				}
 				return nil, nil
