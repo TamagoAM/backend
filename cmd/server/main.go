@@ -36,6 +36,9 @@ func main() {
 		if err := db.Migrate(dbConn, "migrations/001_init.sql"); err != nil {
 			log.Fatalf("db migrate failed: %v", err)
 		}
+		if err := db.Migrate(dbConn, "migrations/002_add_auth_fields.sql"); err != nil {
+			log.Fatalf("db migrate 002 failed: %v", err)
+		}
 	}
 	log.Println("db migrated")
 
