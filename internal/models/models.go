@@ -76,44 +76,68 @@ type Sickness struct {
 	SicknessID     int     `db:"SicknessId"`
 	Name           string  `db:"Name"`
 	Desc           *string `db:"Desc"`
+	Type           string  `db:"Type"`
+	Severity       string  `db:"Severity"`
 	ExpirationDays *int    `db:"ExpirationDays"`
+	CureCost       *int    `db:"CureCost"`
 	Bonus          *string `db:"Bonus"`
 	Malus          *string `db:"Malus"`
 }
 
 type Trait struct {
-	TraitID int     `db:"TraitId"`
-	Name    string  `db:"Name"`
-	Desc    *string `db:"Desc"`
-	Bonus   *string `db:"Bonus"`
-	Malus   *string `db:"Malus"`
+	TraitID  int     `db:"TraitId"`
+	Name     string  `db:"Name"`
+	Desc     *string `db:"Desc"`
+	Category string  `db:"Category"`
+	Bonus    *string `db:"Bonus"`
+	Malus    *string `db:"Malus"`
 }
 
 type Bonus struct {
-	BonusID int     `db:"BonusId"`
-	Name    string  `db:"Name"`
-	Desc    *string `db:"Desc"`
-	Effet   *string `db:"Effet"`
+	BonusID  int     `db:"BonusId"`
+	Name     string  `db:"Name"`
+	Desc     *string `db:"Desc"`
+	Effet    *string `db:"Effet"`
+	Duration *int    `db:"Duration"`
 }
 
 type Malus struct {
-	MalusID int     `db:"MalusId"`
-	Name    string  `db:"Name"`
-	Desc    *string `db:"Desc"`
-	Effet   *string `db:"Effet"`
+	MalusID  int     `db:"MalusId"`
+	Name     string  `db:"Name"`
+	Desc     *string `db:"Desc"`
+	Effet    *string `db:"Effet"`
+	Duration *int    `db:"Duration"`
 }
 
 type Event struct {
-	EventID int     `db:"EventId"`
-	Name    string  `db:"Name"`
-	Desc    *string `db:"Desc"`
-	Bonus   *string `db:"Bonus"`
-	Malus   *string `db:"Malus"`
+	EventID  int     `db:"EventId"`
+	Name     string  `db:"Name"`
+	Desc     *string `db:"Desc"`
+	Severity string  `db:"Severity"`
+	Scope    string  `db:"Scope"`
+	MinStage *string `db:"MinStage"`
+	Bonus    *string `db:"Bonus"`
+	Malus    *string `db:"Malus"`
 }
 
 type LifeChoice struct {
 	LifeChoiceID int     `db:"LifeChoicesId"`
 	Name         string  `db:"Name"`
 	Desc         *string `db:"Desc"`
+	Stage        string  `db:"Stage"`
+	Rarity       string  `db:"Rarity"`
+	ChoiceType   string  `db:"ChoiceType"`
 	Traits       *string `db:"Traits"`
+	Bonus        *string `db:"Bonus"`
+	Malus        *string `db:"Malus"`
+}
+
+type ActiveEvent struct {
+	ActiveEventID int        `db:"ActiveEventId"`
+	EventID       int        `db:"EventId"`
+	TargetUserID  *int       `db:"TargetUserId"`
+	StartDate     time.Time  `db:"StartDate"`
+	EndDate       *time.Time `db:"EndDate"`
+	TriggeredBy   *int       `db:"TriggeredBy"`
+	IsGlobal      bool       `db:"IsGlobal"`
 }

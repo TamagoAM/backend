@@ -2,6 +2,7 @@
 -- Drop all tables in reverse dependency order
 -- so foreign keys don't block the drops.
 -- ═══════════════════════════════════════════════════
+DROP TABLE IF EXISTS ActiveEvent;
 DROP TABLE IF EXISTS LifeChoices;
 DROP TABLE IF EXISTS Event;
 DROP TABLE IF EXISTS Malus;
@@ -115,21 +116,27 @@ CREATE TABLE Sickness (
     SicknessId INT NOT NULL AUTO_INCREMENT,
     Name VARCHAR(100) NOT NULL,
     `Desc` TEXT,
+    Type ENUM('congenital','acquired','both') NOT NULL DEFAULT 'acquired',
+    Severity ENUM('mild','moderate','severe') NOT NULL DEFAULT 'mild',
     ExpirationDays INT,
+    CureCost INT,
     Bonus NVARCHAR(255),
     Malus NVARCHAR(255),
     PRIMARY KEY (SicknessId),
-    INDEX idx_name (Name)
+    INDEX idx_name (Name),
+    INDEX idx_type (Type)
 ) ENGINE=InnoDB;
 
 CREATE TABLE Trait (
     TraitId INT NOT NULL AUTO_INCREMENT,
     Name VARCHAR(100) NOT NULL,
     `Desc` TEXT,
+    Category ENUM('positive','negative') NOT NULL DEFAULT 'positive',
     Bonus NVARCHAR(255),
     Malus NVARCHAR(255),
     PRIMARY KEY (TraitId),
-    INDEX idx_name (Name)
+    INDEX idx_name (Name),
+    INDEX idx_category (Category)
 ) ENGINE=InnoDB;
 
 CREATE TABLE Bonus (
@@ -137,6 +144,7 @@ CREATE TABLE Bonus (
     Name VARCHAR(100) NOT NULL,
     `Desc` TEXT,
     Effet VARCHAR(255),
+    Duration INT,
     PRIMARY KEY (BonusId),
     INDEX idx_name (Name)
 ) ENGINE=InnoDB;
@@ -146,6 +154,7 @@ CREATE TABLE Malus (
     Name VARCHAR(100) NOT NULL,
     `Desc` TEXT,
     Effet VARCHAR(255),
+    Duration INT,
     PRIMARY KEY (MalusId),
     INDEX idx_name (Name)
 ) ENGINE=InnoDB;
@@ -154,17 +163,46 @@ CREATE TABLE Event (
     EventId INT NOT NULL AUTO_INCREMENT,
     Name VARCHAR(100) NOT NULL,
     `Desc` TEXT,
+    Severity ENUM('minor','major','catastrophic') NOT NULL DEFAULT 'minor',
+    Scope ENUM('individual','global') NOT NULL DEFAULT 'individual',
+    MinStage ENUM('infancy','childhood','teenage','earlyAdult','midAdult','lateAdult','elderly') DEFAULT NULL,
     Bonus NVARCHAR(255),
     Malus NVARCHAR(255),
     PRIMARY KEY (EventId),
-    INDEX idx_name (Name)
+    INDEX idx_name (Name),
+    INDEX idx_scope (Scope)
 ) ENGINE=InnoDB;
 
 CREATE TABLE LifeChoices (
     LifeChoicesId INT NOT NULL AUTO_INCREMENT,
     Name VARCHAR(100) NOT NULL,
     `Desc` TEXT,
+    Stage ENUM('infancy','childhood','teenage','earlyAdult','midAdult','lateAdult','elderly') NOT NULL DEFAULT 'childhood',
+    Rarity ENUM('common','uncommon','rare') NOT NULL DEFAULT 'common',
+    ChoiceType ENUM('pool','yesno') NOT NULL DEFAULT 'pool',
     Traits NVARCHAR(255),
+    Bonus NVARCHAR(255),
+    Malus NVARCHAR(255),
     PRIMARY KEY (LifeChoicesId),
-    INDEX idx_name (Name)
+    INDEX idx_name (Name),
+    INDEX idx_stage (Stage)
+) ENGINE=InnoDB;
+
+-- Active events table: admin-triggered or system-triggered global/individual events
+CREATE TABLE ActiveEvent (
+    ActiveEventId INT NOT NULL AUTO_INCREMENT,
+    EventId INT NOT NULL,
+    TargetUserId INT,
+    StartDate DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    EndDate DATETIME,
+    TriggeredBy INT,
+    IsGlobal BOOLEAN NOT NULL DEFAULT FALSE,
+    PRIMARY KEY (ActiveEventId),
+    FOREIGN KEY (EventId) REFERENCES Event(EventId) ON DELETE CASCADE,
+    FOREIGN KEY (TargetUserId) REFERENCES Users(UserId) ON DELETE CASCADE,
+    FOREIGN KEY (TriggeredBy) REFERENCES Users(UserId) ON DELETE SET NULL,
+    INDEX idx_event (EventId),
+    INDEX idx_target (TargetUserId),
+    INDEX idx_global (IsGlobal),
+    INDEX idx_dates (StartDate, EndDate)
 ) ENGINE=InnoDB;

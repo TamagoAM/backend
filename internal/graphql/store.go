@@ -72,6 +72,12 @@ type Store interface {
 	CreateLifeChoice(ctx context.Context, input CreateLifeChoiceInput) (*models.LifeChoice, error)
 	UpdateLifeChoice(ctx context.Context, id int, input CreateLifeChoiceInput) (*models.LifeChoice, error)
 	DeleteLifeChoice(ctx context.Context, id int) (bool, error)
+	ListActiveEvents(ctx context.Context) ([]models.ActiveEvent, error)
+	GetActiveEvent(ctx context.Context, id int) (*models.ActiveEvent, error)
+	CreateActiveEvent(ctx context.Context, input CreateActiveEventInput) (*models.ActiveEvent, error)
+	DeleteActiveEvent(ctx context.Context, id int) (bool, error)
+	ActiveEventsByUser(ctx context.Context, userID int) ([]models.ActiveEvent, error)
+	GlobalActiveEvents(ctx context.Context) ([]models.ActiveEvent, error)
 
 	// User-scoped queries for user monitor
 	TamasByUser(ctx context.Context, userID int) ([]models.Tama, error)
@@ -387,7 +393,7 @@ func (s *SQLStore) GetSickness(ctx context.Context, id int) (*models.Sickness, e
 }
 
 func (s *SQLStore) CreateSickness(ctx context.Context, input CreateSicknessInput) (*models.Sickness, error) {
-	res, err := s.db.ExecContext(ctx, "INSERT INTO Sickness (Name, `Desc`, ExpirationDays, Bonus, Malus) VALUES (?, ?, ?, ?, ?)", input.Name, input.Desc, input.ExpirationDays, input.Bonus, input.Malus)
+	res, err := s.db.ExecContext(ctx, "INSERT INTO Sickness (Name, `Desc`, Type, Severity, ExpirationDays, CureCost, Bonus, Malus) VALUES (?, ?, ?, ?, ?, ?, ?, ?)", input.Name, input.Desc, input.Type, input.Severity, input.ExpirationDays, input.CureCost, input.Bonus, input.Malus)
 	if err != nil {
 		return nil, err
 	}
@@ -399,7 +405,7 @@ func (s *SQLStore) CreateSickness(ctx context.Context, input CreateSicknessInput
 }
 
 func (s *SQLStore) UpdateSickness(ctx context.Context, id int, input CreateSicknessInput) (*models.Sickness, error) {
-	_, err := s.db.ExecContext(ctx, "UPDATE Sickness SET Name = ?, `Desc` = ?, ExpirationDays = ?, Bonus = ?, Malus = ? WHERE SicknessId = ?", input.Name, input.Desc, input.ExpirationDays, input.Bonus, input.Malus, id)
+	_, err := s.db.ExecContext(ctx, "UPDATE Sickness SET Name = ?, `Desc` = ?, Type = ?, Severity = ?, ExpirationDays = ?, CureCost = ?, Bonus = ?, Malus = ? WHERE SicknessId = ?", input.Name, input.Desc, input.Type, input.Severity, input.ExpirationDays, input.CureCost, input.Bonus, input.Malus, id)
 	if err != nil {
 		return nil, err
 	}
@@ -431,7 +437,7 @@ func (s *SQLStore) GetTrait(ctx context.Context, id int) (*models.Trait, error) 
 }
 
 func (s *SQLStore) CreateTrait(ctx context.Context, input CreateTraitInput) (*models.Trait, error) {
-	res, err := s.db.ExecContext(ctx, "INSERT INTO Trait (Name, `Desc`, Bonus, Malus) VALUES (?, ?, ?, ?)", input.Name, input.Desc, input.Bonus, input.Malus)
+	res, err := s.db.ExecContext(ctx, "INSERT INTO Trait (Name, `Desc`, Category, Bonus, Malus) VALUES (?, ?, ?, ?, ?)", input.Name, input.Desc, input.Category, input.Bonus, input.Malus)
 	if err != nil {
 		return nil, err
 	}
@@ -443,7 +449,7 @@ func (s *SQLStore) CreateTrait(ctx context.Context, input CreateTraitInput) (*mo
 }
 
 func (s *SQLStore) UpdateTrait(ctx context.Context, id int, input CreateTraitInput) (*models.Trait, error) {
-	_, err := s.db.ExecContext(ctx, "UPDATE Trait SET Name = ?, `Desc` = ?, Bonus = ?, Malus = ? WHERE TraitId = ?", input.Name, input.Desc, input.Bonus, input.Malus, id)
+	_, err := s.db.ExecContext(ctx, "UPDATE Trait SET Name = ?, `Desc` = ?, Category = ?, Bonus = ?, Malus = ? WHERE TraitId = ?", input.Name, input.Desc, input.Category, input.Bonus, input.Malus, id)
 	if err != nil {
 		return nil, err
 	}
@@ -475,7 +481,7 @@ func (s *SQLStore) GetBonus(ctx context.Context, id int) (*models.Bonus, error) 
 }
 
 func (s *SQLStore) CreateBonus(ctx context.Context, input CreateBonusInput) (*models.Bonus, error) {
-	res, err := s.db.ExecContext(ctx, "INSERT INTO Bonus (Name, `Desc`, Effet) VALUES (?, ?, ?)", input.Name, input.Desc, input.Effet)
+	res, err := s.db.ExecContext(ctx, "INSERT INTO Bonus (Name, `Desc`, Effet, Duration) VALUES (?, ?, ?, ?)", input.Name, input.Desc, input.Effet, input.Duration)
 	if err != nil {
 		return nil, err
 	}
@@ -487,7 +493,7 @@ func (s *SQLStore) CreateBonus(ctx context.Context, input CreateBonusInput) (*mo
 }
 
 func (s *SQLStore) UpdateBonus(ctx context.Context, id int, input CreateBonusInput) (*models.Bonus, error) {
-	_, err := s.db.ExecContext(ctx, "UPDATE Bonus SET Name = ?, `Desc` = ?, Effet = ? WHERE BonusId = ?", input.Name, input.Desc, input.Effet, id)
+	_, err := s.db.ExecContext(ctx, "UPDATE Bonus SET Name = ?, `Desc` = ?, Effet = ?, Duration = ? WHERE BonusId = ?", input.Name, input.Desc, input.Effet, input.Duration, id)
 	if err != nil {
 		return nil, err
 	}
@@ -519,7 +525,7 @@ func (s *SQLStore) GetMalus(ctx context.Context, id int) (*models.Malus, error) 
 }
 
 func (s *SQLStore) CreateMalus(ctx context.Context, input CreateMalusInput) (*models.Malus, error) {
-	res, err := s.db.ExecContext(ctx, "INSERT INTO Malus (Name, `Desc`, Effet) VALUES (?, ?, ?)", input.Name, input.Desc, input.Effet)
+	res, err := s.db.ExecContext(ctx, "INSERT INTO Malus (Name, `Desc`, Effet, Duration) VALUES (?, ?, ?, ?)", input.Name, input.Desc, input.Effet, input.Duration)
 	if err != nil {
 		return nil, err
 	}
@@ -531,7 +537,7 @@ func (s *SQLStore) CreateMalus(ctx context.Context, input CreateMalusInput) (*mo
 }
 
 func (s *SQLStore) UpdateMalus(ctx context.Context, id int, input CreateMalusInput) (*models.Malus, error) {
-	_, err := s.db.ExecContext(ctx, "UPDATE Malus SET Name = ?, `Desc` = ?, Effet = ? WHERE MalusId = ?", input.Name, input.Desc, input.Effet, id)
+	_, err := s.db.ExecContext(ctx, "UPDATE Malus SET Name = ?, `Desc` = ?, Effet = ?, Duration = ? WHERE MalusId = ?", input.Name, input.Desc, input.Effet, input.Duration, id)
 	if err != nil {
 		return nil, err
 	}
@@ -563,7 +569,7 @@ func (s *SQLStore) GetEvent(ctx context.Context, id int) (*models.Event, error) 
 }
 
 func (s *SQLStore) CreateEvent(ctx context.Context, input CreateEventInput) (*models.Event, error) {
-	res, err := s.db.ExecContext(ctx, "INSERT INTO Event (Name, `Desc`, Bonus, Malus) VALUES (?, ?, ?, ?)", input.Name, input.Desc, input.Bonus, input.Malus)
+	res, err := s.db.ExecContext(ctx, "INSERT INTO Event (Name, `Desc`, Severity, Scope, MinStage, Bonus, Malus) VALUES (?, ?, ?, ?, ?, ?, ?)", input.Name, input.Desc, input.Severity, input.Scope, input.MinStage, input.Bonus, input.Malus)
 	if err != nil {
 		return nil, err
 	}
@@ -575,7 +581,7 @@ func (s *SQLStore) CreateEvent(ctx context.Context, input CreateEventInput) (*mo
 }
 
 func (s *SQLStore) UpdateEvent(ctx context.Context, id int, input CreateEventInput) (*models.Event, error) {
-	_, err := s.db.ExecContext(ctx, "UPDATE Event SET Name = ?, `Desc` = ?, Bonus = ?, Malus = ? WHERE EventId = ?", input.Name, input.Desc, input.Bonus, input.Malus, id)
+	_, err := s.db.ExecContext(ctx, "UPDATE Event SET Name = ?, `Desc` = ?, Severity = ?, Scope = ?, MinStage = ?, Bonus = ?, Malus = ? WHERE EventId = ?", input.Name, input.Desc, input.Severity, input.Scope, input.MinStage, input.Bonus, input.Malus, id)
 	if err != nil {
 		return nil, err
 	}
@@ -607,7 +613,7 @@ func (s *SQLStore) GetLifeChoice(ctx context.Context, id int) (*models.LifeChoic
 }
 
 func (s *SQLStore) CreateLifeChoice(ctx context.Context, input CreateLifeChoiceInput) (*models.LifeChoice, error) {
-	res, err := s.db.ExecContext(ctx, "INSERT INTO LifeChoices (Name, `Desc`, Traits) VALUES (?, ?, ?)", input.Name, input.Desc, input.Traits)
+	res, err := s.db.ExecContext(ctx, "INSERT INTO LifeChoices (Name, `Desc`, Stage, Rarity, ChoiceType, Traits, Bonus, Malus) VALUES (?, ?, ?, ?, ?, ?, ?, ?)", input.Name, input.Desc, input.Stage, input.Rarity, input.ChoiceType, input.Traits, input.Bonus, input.Malus)
 	if err != nil {
 		return nil, err
 	}
@@ -619,7 +625,7 @@ func (s *SQLStore) CreateLifeChoice(ctx context.Context, input CreateLifeChoiceI
 }
 
 func (s *SQLStore) UpdateLifeChoice(ctx context.Context, id int, input CreateLifeChoiceInput) (*models.LifeChoice, error) {
-	_, err := s.db.ExecContext(ctx, "UPDATE LifeChoices SET Name = ?, `Desc` = ?, Traits = ? WHERE LifeChoicesId = ?", input.Name, input.Desc, input.Traits, id)
+	_, err := s.db.ExecContext(ctx, "UPDATE LifeChoices SET Name = ?, `Desc` = ?, Stage = ?, Rarity = ?, ChoiceType = ?, Traits = ?, Bonus = ?, Malus = ? WHERE LifeChoicesId = ?", input.Name, input.Desc, input.Stage, input.Rarity, input.ChoiceType, input.Traits, input.Bonus, input.Malus, id)
 	if err != nil {
 		return nil, err
 	}
@@ -665,4 +671,54 @@ func (s *SQLStore) TamaStatsByUser(ctx context.Context, userID int) ([]models.Ta
 	var stats []models.TamaStat
 	err := s.db.SelectContext(ctx, &stats, "SELECT ts.* FROM Tama_stats ts INNER JOIN Tama t ON t.TamaStatsID = ts.TamaStatId WHERE t.UserId = ? ORDER BY ts.TamaStatId DESC", userID)
 	return stats, err
+}
+
+// ─── ActiveEvent CRUD ─────────────────────────────────
+
+func (s *SQLStore) ListActiveEvents(ctx context.Context) ([]models.ActiveEvent, error) {
+	var events []models.ActiveEvent
+	err := s.db.SelectContext(ctx, &events, "SELECT * FROM ActiveEvent ORDER BY StartDate DESC")
+	return events, err
+}
+
+func (s *SQLStore) GetActiveEvent(ctx context.Context, id int) (*models.ActiveEvent, error) {
+	var event models.ActiveEvent
+	err := s.db.GetContext(ctx, &event, "SELECT * FROM ActiveEvent WHERE ActiveEventId = ?", id)
+	if err != nil {
+		return nil, err
+	}
+	return &event, nil
+}
+
+func (s *SQLStore) CreateActiveEvent(ctx context.Context, input CreateActiveEventInput) (*models.ActiveEvent, error) {
+	res, err := s.db.ExecContext(ctx, "INSERT INTO ActiveEvent (EventId, TargetUserId, EndDate, TriggeredBy, IsGlobal) VALUES (?, ?, ?, ?, ?)", input.EventID, input.TargetUserID, input.EndDate, input.TriggeredBy, input.IsGlobal)
+	if err != nil {
+		return nil, err
+	}
+	id, err := res.LastInsertId()
+	if err != nil {
+		return nil, err
+	}
+	return s.GetActiveEvent(ctx, int(id))
+}
+
+func (s *SQLStore) DeleteActiveEvent(ctx context.Context, id int) (bool, error) {
+	res, err := s.db.ExecContext(ctx, `DELETE FROM ActiveEvent WHERE ActiveEventId = ?`, id)
+	if err != nil {
+		return false, err
+	}
+	rows, _ := res.RowsAffected()
+	return rows > 0, nil
+}
+
+func (s *SQLStore) ActiveEventsByUser(ctx context.Context, userID int) ([]models.ActiveEvent, error) {
+	var events []models.ActiveEvent
+	err := s.db.SelectContext(ctx, &events, "SELECT * FROM ActiveEvent WHERE TargetUserId = ? OR IsGlobal = TRUE ORDER BY StartDate DESC", userID)
+	return events, err
+}
+
+func (s *SQLStore) GlobalActiveEvents(ctx context.Context) ([]models.ActiveEvent, error) {
+	var events []models.ActiveEvent
+	err := s.db.SelectContext(ctx, &events, "SELECT * FROM ActiveEvent WHERE IsGlobal = TRUE ORDER BY StartDate DESC")
+	return events, err
 }

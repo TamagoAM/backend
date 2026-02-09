@@ -79,41 +79,63 @@ type CreateSponsorInput struct {
 type CreateSicknessInput struct {
 	Name           string
 	Desc           *string
+	Type           string
+	Severity       string
 	ExpirationDays *int
+	CureCost       *int
 	Bonus          *string
 	Malus          *string
 }
 
 type CreateTraitInput struct {
-	Name  string
-	Desc  *string
-	Bonus *string
-	Malus *string
+	Name     string
+	Desc     *string
+	Category string
+	Bonus    *string
+	Malus    *string
 }
 
 type CreateBonusInput struct {
-	Name  string
-	Desc  *string
-	Effet *string
+	Name     string
+	Desc     *string
+	Effet    *string
+	Duration *int
 }
 
 type CreateMalusInput struct {
-	Name  string
-	Desc  *string
-	Effet *string
+	Name     string
+	Desc     *string
+	Effet    *string
+	Duration *int
 }
 
 type CreateEventInput struct {
-	Name  string
-	Desc  *string
-	Bonus *string
-	Malus *string
+	Name     string
+	Desc     *string
+	Severity string
+	Scope    string
+	MinStage *string
+	Bonus    *string
+	Malus    *string
 }
 
 type CreateLifeChoiceInput struct {
-	Name   string
-	Desc   *string
-	Traits *string
+	Name       string
+	Desc       *string
+	Stage      string
+	Rarity     string
+	ChoiceType string
+	Traits     *string
+	Bonus      *string
+	Malus      *string
+}
+
+type CreateActiveEventInput struct {
+	EventID      int
+	TargetUserID *int
+	EndDate      *time.Time
+	TriggeredBy  *int
+	IsGlobal     bool
 }
 
 // sourceAs extracts the concrete value from p.Source whether it was passed
@@ -503,6 +525,24 @@ func NewSchema(db *sqlx.DB) (graphql.Schema, error) {
 				}
 				return nil, nil
 			}},
+			"type": &graphql.Field{Type: graphql.String, Resolve: func(p graphql.ResolveParams) (interface{}, error) {
+				if s, ok := sourceAs[models.Sickness](p.Source); ok {
+					return s.Type, nil
+				}
+				return nil, nil
+			}},
+			"severity": &graphql.Field{Type: graphql.String, Resolve: func(p graphql.ResolveParams) (interface{}, error) {
+				if s, ok := sourceAs[models.Sickness](p.Source); ok {
+					return s.Severity, nil
+				}
+				return nil, nil
+			}},
+			"cureCost": &graphql.Field{Type: graphql.Int, Resolve: func(p graphql.ResolveParams) (interface{}, error) {
+				if s, ok := sourceAs[models.Sickness](p.Source); ok {
+					return s.CureCost, nil
+				}
+				return nil, nil
+			}},
 			"bonus": &graphql.Field{Type: graphql.String, Resolve: func(p graphql.ResolveParams) (interface{}, error) {
 				if s, ok := sourceAs[models.Sickness](p.Source); ok {
 					return s.Bonus, nil
@@ -536,6 +576,12 @@ func NewSchema(db *sqlx.DB) (graphql.Schema, error) {
 			"desc": &graphql.Field{Type: graphql.String, Resolve: func(p graphql.ResolveParams) (interface{}, error) {
 				if t, ok := sourceAs[models.Trait](p.Source); ok {
 					return t.Desc, nil
+				}
+				return nil, nil
+			}},
+			"category": &graphql.Field{Type: graphql.String, Resolve: func(p graphql.ResolveParams) (interface{}, error) {
+				if t, ok := sourceAs[models.Trait](p.Source); ok {
+					return t.Category, nil
 				}
 				return nil, nil
 			}},
@@ -581,6 +627,12 @@ func NewSchema(db *sqlx.DB) (graphql.Schema, error) {
 				}
 				return nil, nil
 			}},
+			"duration": &graphql.Field{Type: graphql.Int, Resolve: func(p graphql.ResolveParams) (interface{}, error) {
+				if b, ok := sourceAs[models.Bonus](p.Source); ok {
+					return b.Duration, nil
+				}
+				return nil, nil
+			}},
 		},
 	})
 
@@ -611,6 +663,12 @@ func NewSchema(db *sqlx.DB) (graphql.Schema, error) {
 				}
 				return nil, nil
 			}},
+			"duration": &graphql.Field{Type: graphql.Int, Resolve: func(p graphql.ResolveParams) (interface{}, error) {
+				if m, ok := sourceAs[models.Malus](p.Source); ok {
+					return m.Duration, nil
+				}
+				return nil, nil
+			}},
 		},
 	})
 
@@ -632,6 +690,24 @@ func NewSchema(db *sqlx.DB) (graphql.Schema, error) {
 			"desc": &graphql.Field{Type: graphql.String, Resolve: func(p graphql.ResolveParams) (interface{}, error) {
 				if e, ok := sourceAs[models.Event](p.Source); ok {
 					return e.Desc, nil
+				}
+				return nil, nil
+			}},
+			"severity": &graphql.Field{Type: graphql.String, Resolve: func(p graphql.ResolveParams) (interface{}, error) {
+				if e, ok := sourceAs[models.Event](p.Source); ok {
+					return e.Severity, nil
+				}
+				return nil, nil
+			}},
+			"scope": &graphql.Field{Type: graphql.String, Resolve: func(p graphql.ResolveParams) (interface{}, error) {
+				if e, ok := sourceAs[models.Event](p.Source); ok {
+					return e.Scope, nil
+				}
+				return nil, nil
+			}},
+			"minStage": &graphql.Field{Type: graphql.String, Resolve: func(p graphql.ResolveParams) (interface{}, error) {
+				if e, ok := sourceAs[models.Event](p.Source); ok {
+					return e.MinStage, nil
 				}
 				return nil, nil
 			}},
@@ -671,9 +747,87 @@ func NewSchema(db *sqlx.DB) (graphql.Schema, error) {
 				}
 				return nil, nil
 			}},
+			"stage": &graphql.Field{Type: graphql.String, Resolve: func(p graphql.ResolveParams) (interface{}, error) {
+				if l, ok := sourceAs[models.LifeChoice](p.Source); ok {
+					return l.Stage, nil
+				}
+				return nil, nil
+			}},
+			"rarity": &graphql.Field{Type: graphql.String, Resolve: func(p graphql.ResolveParams) (interface{}, error) {
+				if l, ok := sourceAs[models.LifeChoice](p.Source); ok {
+					return l.Rarity, nil
+				}
+				return nil, nil
+			}},
+			"choiceType": &graphql.Field{Type: graphql.String, Resolve: func(p graphql.ResolveParams) (interface{}, error) {
+				if l, ok := sourceAs[models.LifeChoice](p.Source); ok {
+					return l.ChoiceType, nil
+				}
+				return nil, nil
+			}},
 			"traits": &graphql.Field{Type: graphql.String, Resolve: func(p graphql.ResolveParams) (interface{}, error) {
 				if l, ok := sourceAs[models.LifeChoice](p.Source); ok {
 					return l.Traits, nil
+				}
+				return nil, nil
+			}},
+			"bonus": &graphql.Field{Type: graphql.String, Resolve: func(p graphql.ResolveParams) (interface{}, error) {
+				if l, ok := sourceAs[models.LifeChoice](p.Source); ok {
+					return l.Bonus, nil
+				}
+				return nil, nil
+			}},
+			"malus": &graphql.Field{Type: graphql.String, Resolve: func(p graphql.ResolveParams) (interface{}, error) {
+				if l, ok := sourceAs[models.LifeChoice](p.Source); ok {
+					return l.Malus, nil
+				}
+				return nil, nil
+			}},
+		},
+	})
+
+	activeEventType := graphql.NewObject(graphql.ObjectConfig{
+		Name: "ActiveEvent",
+		Fields: graphql.Fields{
+			"id": &graphql.Field{Type: graphql.Int, Resolve: func(p graphql.ResolveParams) (interface{}, error) {
+				if a, ok := sourceAs[models.ActiveEvent](p.Source); ok {
+					return a.ActiveEventID, nil
+				}
+				return nil, nil
+			}},
+			"eventId": &graphql.Field{Type: graphql.Int, Resolve: func(p graphql.ResolveParams) (interface{}, error) {
+				if a, ok := sourceAs[models.ActiveEvent](p.Source); ok {
+					return a.EventID, nil
+				}
+				return nil, nil
+			}},
+			"targetUserId": &graphql.Field{Type: graphql.Int, Resolve: func(p graphql.ResolveParams) (interface{}, error) {
+				if a, ok := sourceAs[models.ActiveEvent](p.Source); ok {
+					return a.TargetUserID, nil
+				}
+				return nil, nil
+			}},
+			"startDate": &graphql.Field{Type: graphql.String, Resolve: func(p graphql.ResolveParams) (interface{}, error) {
+				if a, ok := sourceAs[models.ActiveEvent](p.Source); ok {
+					return formatTimeValue(&a.StartDate), nil
+				}
+				return nil, nil
+			}},
+			"endDate": &graphql.Field{Type: graphql.String, Resolve: func(p graphql.ResolveParams) (interface{}, error) {
+				if a, ok := sourceAs[models.ActiveEvent](p.Source); ok {
+					return formatTimeValue(a.EndDate), nil
+				}
+				return nil, nil
+			}},
+			"triggeredBy": &graphql.Field{Type: graphql.Int, Resolve: func(p graphql.ResolveParams) (interface{}, error) {
+				if a, ok := sourceAs[models.ActiveEvent](p.Source); ok {
+					return a.TriggeredBy, nil
+				}
+				return nil, nil
+			}},
+			"isGlobal": &graphql.Field{Type: graphql.Boolean, Resolve: func(p graphql.ResolveParams) (interface{}, error) {
+				if a, ok := sourceAs[models.ActiveEvent](p.Source); ok {
+					return a.IsGlobal, nil
 				}
 				return nil, nil
 			}},
@@ -763,6 +917,28 @@ func NewSchema(db *sqlx.DB) (graphql.Schema, error) {
 				Type: graphql.NewList(lifeChoiceType),
 				Resolve: func(p graphql.ResolveParams) (interface{}, error) {
 					return store.ListLifeChoices(p.Context)
+				},
+			},
+			"activeEvents": &graphql.Field{
+				Type: graphql.NewList(activeEventType),
+				Resolve: func(p graphql.ResolveParams) (interface{}, error) {
+					return store.ListActiveEvents(p.Context)
+				},
+			},
+			"activeEventsByUser": &graphql.Field{
+				Type: graphql.NewList(activeEventType),
+				Args: graphql.FieldConfigArgument{
+					"userId": &graphql.ArgumentConfig{Type: graphql.NewNonNull(graphql.Int)},
+				},
+				Resolve: func(p graphql.ResolveParams) (interface{}, error) {
+					userID := p.Args["userId"].(int)
+					return store.ActiveEventsByUser(p.Context, userID)
+				},
+			},
+			"globalActiveEvents": &graphql.Field{
+				Type: graphql.NewList(activeEventType),
+				Resolve: func(p graphql.ResolveParams) (interface{}, error) {
+					return store.GlobalActiveEvents(p.Context)
 				},
 			},
 
@@ -908,7 +1084,10 @@ func NewSchema(db *sqlx.DB) (graphql.Schema, error) {
 		Fields: graphql.InputObjectConfigFieldMap{
 			"name":           &graphql.InputObjectFieldConfig{Type: graphql.NewNonNull(graphql.String)},
 			"desc":           &graphql.InputObjectFieldConfig{Type: graphql.String},
+			"type":           &graphql.InputObjectFieldConfig{Type: graphql.String},
+			"severity":       &graphql.InputObjectFieldConfig{Type: graphql.String},
 			"expirationDays": &graphql.InputObjectFieldConfig{Type: graphql.Int},
+			"cureCost":       &graphql.InputObjectFieldConfig{Type: graphql.Int},
 			"bonus":          &graphql.InputObjectFieldConfig{Type: graphql.String},
 			"malus":          &graphql.InputObjectFieldConfig{Type: graphql.String},
 		},
@@ -917,47 +1096,69 @@ func NewSchema(db *sqlx.DB) (graphql.Schema, error) {
 	createTraitInput := graphql.NewInputObject(graphql.InputObjectConfig{
 		Name: "CreateTraitInput",
 		Fields: graphql.InputObjectConfigFieldMap{
-			"name":  &graphql.InputObjectFieldConfig{Type: graphql.NewNonNull(graphql.String)},
-			"desc":  &graphql.InputObjectFieldConfig{Type: graphql.String},
-			"bonus": &graphql.InputObjectFieldConfig{Type: graphql.String},
-			"malus": &graphql.InputObjectFieldConfig{Type: graphql.String},
+			"name":     &graphql.InputObjectFieldConfig{Type: graphql.NewNonNull(graphql.String)},
+			"desc":     &graphql.InputObjectFieldConfig{Type: graphql.String},
+			"category": &graphql.InputObjectFieldConfig{Type: graphql.String},
+			"bonus":    &graphql.InputObjectFieldConfig{Type: graphql.String},
+			"malus":    &graphql.InputObjectFieldConfig{Type: graphql.String},
 		},
 	})
 
 	createBonusInput := graphql.NewInputObject(graphql.InputObjectConfig{
 		Name: "CreateBonusInput",
 		Fields: graphql.InputObjectConfigFieldMap{
-			"name":  &graphql.InputObjectFieldConfig{Type: graphql.NewNonNull(graphql.String)},
-			"desc":  &graphql.InputObjectFieldConfig{Type: graphql.String},
-			"effet": &graphql.InputObjectFieldConfig{Type: graphql.String},
+			"name":     &graphql.InputObjectFieldConfig{Type: graphql.NewNonNull(graphql.String)},
+			"desc":     &graphql.InputObjectFieldConfig{Type: graphql.String},
+			"effet":    &graphql.InputObjectFieldConfig{Type: graphql.String},
+			"duration": &graphql.InputObjectFieldConfig{Type: graphql.Int},
 		},
 	})
 
 	createMalusInput := graphql.NewInputObject(graphql.InputObjectConfig{
 		Name: "CreateMalusInput",
 		Fields: graphql.InputObjectConfigFieldMap{
-			"name":  &graphql.InputObjectFieldConfig{Type: graphql.NewNonNull(graphql.String)},
-			"desc":  &graphql.InputObjectFieldConfig{Type: graphql.String},
-			"effet": &graphql.InputObjectFieldConfig{Type: graphql.String},
+			"name":     &graphql.InputObjectFieldConfig{Type: graphql.NewNonNull(graphql.String)},
+			"desc":     &graphql.InputObjectFieldConfig{Type: graphql.String},
+			"effet":    &graphql.InputObjectFieldConfig{Type: graphql.String},
+			"duration": &graphql.InputObjectFieldConfig{Type: graphql.Int},
 		},
 	})
 
 	createEventInput := graphql.NewInputObject(graphql.InputObjectConfig{
 		Name: "CreateEventInput",
 		Fields: graphql.InputObjectConfigFieldMap{
-			"name":  &graphql.InputObjectFieldConfig{Type: graphql.NewNonNull(graphql.String)},
-			"desc":  &graphql.InputObjectFieldConfig{Type: graphql.String},
-			"bonus": &graphql.InputObjectFieldConfig{Type: graphql.String},
-			"malus": &graphql.InputObjectFieldConfig{Type: graphql.String},
+			"name":     &graphql.InputObjectFieldConfig{Type: graphql.NewNonNull(graphql.String)},
+			"desc":     &graphql.InputObjectFieldConfig{Type: graphql.String},
+			"severity": &graphql.InputObjectFieldConfig{Type: graphql.String},
+			"scope":    &graphql.InputObjectFieldConfig{Type: graphql.String},
+			"minStage": &graphql.InputObjectFieldConfig{Type: graphql.String},
+			"bonus":    &graphql.InputObjectFieldConfig{Type: graphql.String},
+			"malus":    &graphql.InputObjectFieldConfig{Type: graphql.String},
 		},
 	})
 
 	createLifeChoiceInput := graphql.NewInputObject(graphql.InputObjectConfig{
 		Name: "CreateLifeChoiceInput",
 		Fields: graphql.InputObjectConfigFieldMap{
-			"name":   &graphql.InputObjectFieldConfig{Type: graphql.NewNonNull(graphql.String)},
-			"desc":   &graphql.InputObjectFieldConfig{Type: graphql.String},
-			"traits": &graphql.InputObjectFieldConfig{Type: graphql.String},
+			"name":       &graphql.InputObjectFieldConfig{Type: graphql.NewNonNull(graphql.String)},
+			"desc":       &graphql.InputObjectFieldConfig{Type: graphql.String},
+			"stage":      &graphql.InputObjectFieldConfig{Type: graphql.String},
+			"rarity":     &graphql.InputObjectFieldConfig{Type: graphql.String},
+			"choiceType": &graphql.InputObjectFieldConfig{Type: graphql.String},
+			"traits":     &graphql.InputObjectFieldConfig{Type: graphql.String},
+			"bonus":      &graphql.InputObjectFieldConfig{Type: graphql.String},
+			"malus":      &graphql.InputObjectFieldConfig{Type: graphql.String},
+		},
+	})
+
+	createActiveEventInput := graphql.NewInputObject(graphql.InputObjectConfig{
+		Name: "CreateActiveEventInput",
+		Fields: graphql.InputObjectConfigFieldMap{
+			"eventId":      &graphql.InputObjectFieldConfig{Type: graphql.NewNonNull(graphql.Int)},
+			"targetUserId": &graphql.InputObjectFieldConfig{Type: graphql.Int},
+			"endDate":      &graphql.InputObjectFieldConfig{Type: graphql.String},
+			"triggeredBy":  &graphql.InputObjectFieldConfig{Type: graphql.Int},
+			"isGlobal":     &graphql.InputObjectFieldConfig{Type: graphql.Boolean},
 		},
 	})
 
@@ -1608,9 +1809,30 @@ func NewSchema(db *sqlx.DB) (graphql.Schema, error) {
 							input.Desc = &s
 						}
 					}
+					if v, ok := inputMap["type"]; ok {
+						if s, ok := v.(string); ok {
+							input.Type = s
+						}
+					}
+					if input.Type == "" {
+						input.Type = "acquired"
+					}
+					if v, ok := inputMap["severity"]; ok {
+						if s, ok := v.(string); ok {
+							input.Severity = s
+						}
+					}
+					if input.Severity == "" {
+						input.Severity = "mild"
+					}
 					if v, ok := inputMap["expirationDays"]; ok {
 						if i, ok := v.(int); ok {
 							input.ExpirationDays = &i
+						}
+					}
+					if v, ok := inputMap["cureCost"]; ok {
+						if i, ok := v.(int); ok {
+							input.CureCost = &i
 						}
 					}
 					if v, ok := inputMap["bonus"]; ok {
@@ -1641,9 +1863,30 @@ func NewSchema(db *sqlx.DB) (graphql.Schema, error) {
 							input.Desc = &s
 						}
 					}
+					if v, ok := inputMap["type"]; ok {
+						if s, ok := v.(string); ok {
+							input.Type = s
+						}
+					}
+					if input.Type == "" {
+						input.Type = "acquired"
+					}
+					if v, ok := inputMap["severity"]; ok {
+						if s, ok := v.(string); ok {
+							input.Severity = s
+						}
+					}
+					if input.Severity == "" {
+						input.Severity = "mild"
+					}
 					if v, ok := inputMap["expirationDays"]; ok {
 						if i, ok := v.(int); ok {
 							input.ExpirationDays = &i
+						}
+					}
+					if v, ok := inputMap["cureCost"]; ok {
+						if i, ok := v.(int); ok {
+							input.CureCost = &i
 						}
 					}
 					if v, ok := inputMap["bonus"]; ok {
@@ -1682,6 +1925,14 @@ func NewSchema(db *sqlx.DB) (graphql.Schema, error) {
 							input.Desc = &s
 						}
 					}
+					if v, ok := inputMap["category"]; ok {
+						if s, ok := v.(string); ok {
+							input.Category = s
+						}
+					}
+					if input.Category == "" {
+						input.Category = "positive"
+					}
 					if v, ok := inputMap["bonus"]; ok {
 						if s, ok := v.(string); ok {
 							input.Bonus = &s
@@ -1709,6 +1960,14 @@ func NewSchema(db *sqlx.DB) (graphql.Schema, error) {
 						if s, ok := v.(string); ok {
 							input.Desc = &s
 						}
+					}
+					if v, ok := inputMap["category"]; ok {
+						if s, ok := v.(string); ok {
+							input.Category = s
+						}
+					}
+					if input.Category == "" {
+						input.Category = "positive"
 					}
 					if v, ok := inputMap["bonus"]; ok {
 						if s, ok := v.(string); ok {
@@ -1751,6 +2010,11 @@ func NewSchema(db *sqlx.DB) (graphql.Schema, error) {
 							input.Effet = &s
 						}
 					}
+					if v, ok := inputMap["duration"]; ok {
+						if i, ok := v.(int); ok {
+							input.Duration = &i
+						}
+					}
 					return store.CreateBonus(p.Context, input)
 				},
 			},
@@ -1772,6 +2036,11 @@ func NewSchema(db *sqlx.DB) (graphql.Schema, error) {
 					if v, ok := inputMap["effet"]; ok {
 						if s, ok := v.(string); ok {
 							input.Effet = &s
+						}
+					}
+					if v, ok := inputMap["duration"]; ok {
+						if i, ok := v.(int); ok {
+							input.Duration = &i
 						}
 					}
 					return store.UpdateBonus(p.Context, id, input)
@@ -1805,6 +2074,11 @@ func NewSchema(db *sqlx.DB) (graphql.Schema, error) {
 							input.Effet = &s
 						}
 					}
+					if v, ok := inputMap["duration"]; ok {
+						if i, ok := v.(int); ok {
+							input.Duration = &i
+						}
+					}
 					return store.CreateMalus(p.Context, input)
 				},
 			},
@@ -1826,6 +2100,11 @@ func NewSchema(db *sqlx.DB) (graphql.Schema, error) {
 					if v, ok := inputMap["effet"]; ok {
 						if s, ok := v.(string); ok {
 							input.Effet = &s
+						}
+					}
+					if v, ok := inputMap["duration"]; ok {
+						if i, ok := v.(int); ok {
+							input.Duration = &i
 						}
 					}
 					return store.UpdateMalus(p.Context, id, input)
@@ -1854,6 +2133,27 @@ func NewSchema(db *sqlx.DB) (graphql.Schema, error) {
 							input.Desc = &s
 						}
 					}
+					if v, ok := inputMap["severity"]; ok {
+						if s, ok := v.(string); ok {
+							input.Severity = s
+						}
+					}
+					if input.Severity == "" {
+						input.Severity = "minor"
+					}
+					if v, ok := inputMap["scope"]; ok {
+						if s, ok := v.(string); ok {
+							input.Scope = s
+						}
+					}
+					if input.Scope == "" {
+						input.Scope = "individual"
+					}
+					if v, ok := inputMap["minStage"]; ok {
+						if s, ok := v.(string); ok {
+							input.MinStage = &s
+						}
+					}
 					if v, ok := inputMap["bonus"]; ok {
 						if s, ok := v.(string); ok {
 							input.Bonus = &s
@@ -1880,6 +2180,27 @@ func NewSchema(db *sqlx.DB) (graphql.Schema, error) {
 					if v, ok := inputMap["desc"]; ok {
 						if s, ok := v.(string); ok {
 							input.Desc = &s
+						}
+					}
+					if v, ok := inputMap["severity"]; ok {
+						if s, ok := v.(string); ok {
+							input.Severity = s
+						}
+					}
+					if input.Severity == "" {
+						input.Severity = "minor"
+					}
+					if v, ok := inputMap["scope"]; ok {
+						if s, ok := v.(string); ok {
+							input.Scope = s
+						}
+					}
+					if input.Scope == "" {
+						input.Scope = "individual"
+					}
+					if v, ok := inputMap["minStage"]; ok {
+						if s, ok := v.(string); ok {
+							input.MinStage = &s
 						}
 					}
 					if v, ok := inputMap["bonus"]; ok {
@@ -1918,9 +2239,43 @@ func NewSchema(db *sqlx.DB) (graphql.Schema, error) {
 							input.Desc = &s
 						}
 					}
+					if v, ok := inputMap["stage"]; ok {
+						if s, ok := v.(string); ok {
+							input.Stage = s
+						}
+					}
+					if input.Stage == "" {
+						input.Stage = "childhood"
+					}
+					if v, ok := inputMap["rarity"]; ok {
+						if s, ok := v.(string); ok {
+							input.Rarity = s
+						}
+					}
+					if input.Rarity == "" {
+						input.Rarity = "common"
+					}
+					if v, ok := inputMap["choiceType"]; ok {
+						if s, ok := v.(string); ok {
+							input.ChoiceType = s
+						}
+					}
+					if input.ChoiceType == "" {
+						input.ChoiceType = "pool"
+					}
 					if v, ok := inputMap["traits"]; ok {
 						if s, ok := v.(string); ok {
 							input.Traits = &s
+						}
+					}
+					if v, ok := inputMap["bonus"]; ok {
+						if s, ok := v.(string); ok {
+							input.Bonus = &s
+						}
+					}
+					if v, ok := inputMap["malus"]; ok {
+						if s, ok := v.(string); ok {
+							input.Malus = &s
 						}
 					}
 					return store.CreateLifeChoice(p.Context, input)
@@ -1941,9 +2296,43 @@ func NewSchema(db *sqlx.DB) (graphql.Schema, error) {
 							input.Desc = &s
 						}
 					}
+					if v, ok := inputMap["stage"]; ok {
+						if s, ok := v.(string); ok {
+							input.Stage = s
+						}
+					}
+					if input.Stage == "" {
+						input.Stage = "childhood"
+					}
+					if v, ok := inputMap["rarity"]; ok {
+						if s, ok := v.(string); ok {
+							input.Rarity = s
+						}
+					}
+					if input.Rarity == "" {
+						input.Rarity = "common"
+					}
+					if v, ok := inputMap["choiceType"]; ok {
+						if s, ok := v.(string); ok {
+							input.ChoiceType = s
+						}
+					}
+					if input.ChoiceType == "" {
+						input.ChoiceType = "pool"
+					}
 					if v, ok := inputMap["traits"]; ok {
 						if s, ok := v.(string); ok {
 							input.Traits = &s
+						}
+					}
+					if v, ok := inputMap["bonus"]; ok {
+						if s, ok := v.(string); ok {
+							input.Bonus = &s
+						}
+					}
+					if v, ok := inputMap["malus"]; ok {
+						if s, ok := v.(string); ok {
+							input.Malus = &s
 						}
 					}
 					return store.UpdateLifeChoice(p.Context, id, input)
@@ -1957,6 +2346,49 @@ func NewSchema(db *sqlx.DB) (graphql.Schema, error) {
 				Resolve: func(p graphql.ResolveParams) (interface{}, error) {
 					id := p.Args["id"].(int)
 					return store.DeleteLifeChoice(p.Context, id)
+				},
+			},
+			"createActiveEvent": &graphql.Field{
+				Type: activeEventType,
+				Args: graphql.FieldConfigArgument{
+					"input": &graphql.ArgumentConfig{Type: graphql.NewNonNull(createActiveEventInput)},
+				},
+				Resolve: func(p graphql.ResolveParams) (interface{}, error) {
+					inputMap := p.Args["input"].(map[string]interface{})
+					input := CreateActiveEventInput{EventID: inputMap["eventId"].(int)}
+					if v, ok := inputMap["targetUserId"]; ok {
+						if i, ok := v.(int); ok {
+							input.TargetUserID = &i
+						}
+					}
+					if v, ok := inputMap["endDate"]; ok {
+						if s, ok := v.(string); ok {
+							if t, err := parseDateString(s); err == nil && t != nil {
+								input.EndDate = t
+							}
+						}
+					}
+					if v, ok := inputMap["triggeredBy"]; ok {
+						if i, ok := v.(int); ok {
+							input.TriggeredBy = &i
+						}
+					}
+					if v, ok := inputMap["isGlobal"]; ok {
+						if b, ok := v.(bool); ok {
+							input.IsGlobal = b
+						}
+					}
+					return store.CreateActiveEvent(p.Context, input)
+				},
+			},
+			"deleteActiveEvent": &graphql.Field{
+				Type: graphql.Boolean,
+				Args: graphql.FieldConfigArgument{
+					"id": &graphql.ArgumentConfig{Type: graphql.NewNonNull(graphql.Int)},
+				},
+				Resolve: func(p graphql.ResolveParams) (interface{}, error) {
+					id := p.Args["id"].(int)
+					return store.DeleteActiveEvent(p.Context, id)
 				},
 			},
 		},
