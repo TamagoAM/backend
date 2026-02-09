@@ -47,7 +47,7 @@ CREATE TABLE Race (
     INDEX idx_name (Name)
 ) ENGINE=InnoDB;
 
-CREATE TABLE IF Tama_stats (
+CREATE TABLE Tama_stats (
     TamaStatId INT NOT NULL AUTO_INCREMENT,
     Fed INT DEFAULT 0,
     LastFed DATETIME,
