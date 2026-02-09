@@ -26,11 +26,20 @@ CREATE TABLE IF NOT EXISTS Race (
     INDEX idx_name (Name)
 ) ENGINE=InnoDB;
 
-CREATE TABLE IF NOT EXISTS Tama_stats (
+CREATE TABLE Tama_stats (
     TamaStatId INT NOT NULL AUTO_INCREMENT,
-    Food INT DEFAULT 0,
-    Play INT DEFAULT 0,
+    Fed INT DEFAULT 0,
+    LastFed DATETIME,
+    Played INT DEFAULT 0,
+    LastPlayed DATETIME,
     Cleaned INT DEFAULT 0,
+    LastCleaned DATETIME,
+    Worked INT DEFAULT 0,
+    LastWorked DATETIME,
+    Hunger INT DEFAULT 0,
+    Boredom INT DEFAULT 0,
+    Hygiene INT DEFAULT 0,
+    Money INT DEFAULT 0,
     CarAccident INT DEFAULT 0,
     WorkAccident INT DEFAULT 0,
     SocialSatis DOUBLE DEFAULT 0,

@@ -211,7 +211,7 @@ func (s *SQLStore) GetTamaStat(ctx context.Context, id int) (*models.TamaStat, e
 }
 
 func (s *SQLStore) CreateTamaStat(ctx context.Context, input CreateTamaStatInput) (*models.TamaStat, error) {
-	res, err := s.db.ExecContext(ctx, `INSERT INTO Tama_stats (Food, Play, Cleaned, CarAccident, WorkAccident, SocialSatis, WorkSatis, PersonalSatis) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`, input.Food, input.Play, input.Cleaned, input.CarAccident, input.WorkAccident, input.SocialSatis, input.WorkSatis, input.PersonalSatis)
+	res, err := s.db.ExecContext(ctx, `INSERT INTO Tama_stats (Fed, LastFed, Played, LastPlayed, Cleaned, LastCleaned, Worked, LastWorked, Hunger, Boredom, Hygiene, Money, CarAccident, WorkAccident, SocialSatis, WorkSatis, PersonalSatis) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`, input.Fed, input.LastFed, input.Played, input.LastPlayed, input.Cleaned, input.LastCleaned, input.Worked, input.LastWorked, input.Hunger, input.Boredom, input.Hygiene, input.Money, input.CarAccident, input.WorkAccident, input.SocialSatis, input.WorkSatis, input.PersonalSatis)
 	if err != nil {
 		return nil, err
 	}
@@ -223,7 +223,7 @@ func (s *SQLStore) CreateTamaStat(ctx context.Context, input CreateTamaStatInput
 }
 
 func (s *SQLStore) UpdateTamaStat(ctx context.Context, id int, input CreateTamaStatInput) (*models.TamaStat, error) {
-	_, err := s.db.ExecContext(ctx, `UPDATE Tama_stats SET Food = ?, Play = ?, Cleaned = ?, CarAccident = ?, WorkAccident = ?, SocialSatis = ?, WorkSatis = ?, PersonalSatis = ? WHERE TamaStatId = ?`, input.Food, input.Play, input.Cleaned, input.CarAccident, input.WorkAccident, input.SocialSatis, input.WorkSatis, input.PersonalSatis, id)
+	_, err := s.db.ExecContext(ctx, `UPDATE Tama_stats SET Fed = ?, LastFed = ?, Played = ?, LastPlayed = ?, Cleaned = ?, LastCleaned = ?, Worked = ?, LastWorked = ?, Hunger = ?, Boredom = ?, Hygiene = ?, Money = ?, CarAccident = ?, WorkAccident = ?, SocialSatis = ?, WorkSatis = ?, PersonalSatis = ? WHERE TamaStatId = ?`, input.Fed, input.LastFed, input.Played, input.LastPlayed, input.Cleaned, input.LastCleaned, input.Worked, input.LastWorked, input.Hunger, input.Boredom, input.Hygiene, input.Money, input.CarAccident, input.WorkAccident, input.SocialSatis, input.WorkSatis, input.PersonalSatis, id)
 	if err != nil {
 		return nil, err
 	}

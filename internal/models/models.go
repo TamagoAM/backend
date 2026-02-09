@@ -26,15 +26,24 @@ type Race struct {
 }
 
 type TamaStat struct {
-	TamaStatID    int     `db:"TamaStatId"`
-	Food          int     `db:"Food"`
-	Play          int     `db:"Play"`
-	Cleaned       int     `db:"Cleaned"`
-	CarAccident   int     `db:"CarAccident"`
-	WorkAccident  int     `db:"WorkAccident"`
-	SocialSatis   float64 `db:"SocialSatis"`
-	WorkSatis     float64 `db:"WorkSatis"`
-	PersonalSatis float64 `db:"PersonalSatis"`
+	TamaStatID    int        `db:"TamaStatId"`
+	Fed           int        `db:"Fed"`
+	LastFed       *time.Time `db:"LastFed"`
+	Played        int        `db:"Played"`
+	LastPlayed    *time.Time `db:"LastPlayed"`
+	Cleaned       int        `db:"Cleaned"`
+	LastCleaned   *time.Time `db:"LastCleaned"`
+	Worked        int        `db:"Worked"`
+	LastWorked    *time.Time `db:"LastWorked"`
+	Hunger        int        `db:"Hunger"`
+	Boredom       int        `db:"Boredom"`
+	Hygiene       int        `db:"Hygiene"`
+	Money         int        `db:"Money"`
+	CarAccident   int        `db:"CarAccident"`
+	WorkAccident  int        `db:"WorkAccident"`
+	SocialSatis   float64    `db:"SocialSatis"`
+	WorkSatis     float64    `db:"WorkSatis"`
+	PersonalSatis float64    `db:"PersonalSatis"`
 }
 
 type Tama struct {

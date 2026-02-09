@@ -32,9 +32,18 @@ type CreateRaceInput struct {
 }
 
 type CreateTamaStatInput struct {
-	Food          int
-	Play          int
+	Fed           int
+	LastFed       *time.Time
+	Played        int
+	LastPlayed    *time.Time
 	Cleaned       int
+	LastCleaned   *time.Time
+	Worked        int
+	LastWorked    *time.Time
+	Hunger        int
+	Boredom       int
+	Hygiene       int
+	Money         int
 	CarAccident   int
 	WorkAccident  int
 	SocialSatis   float64
@@ -242,21 +251,75 @@ func NewSchema(db *sqlx.DB) (graphql.Schema, error) {
 				}
 				return nil, nil
 			}},
-			"food": &graphql.Field{Type: graphql.Int, Resolve: func(p graphql.ResolveParams) (interface{}, error) {
+			"fed": &graphql.Field{Type: graphql.Int, Resolve: func(p graphql.ResolveParams) (interface{}, error) {
 				if s, ok := sourceAs[models.TamaStat](p.Source); ok {
-					return s.Food, nil
+					return s.Fed, nil
 				}
 				return nil, nil
 			}},
-			"play": &graphql.Field{Type: graphql.Int, Resolve: func(p graphql.ResolveParams) (interface{}, error) {
+			"lastFed": &graphql.Field{Type: graphql.String, Resolve: func(p graphql.ResolveParams) (interface{}, error) {
 				if s, ok := sourceAs[models.TamaStat](p.Source); ok {
-					return s.Play, nil
+					return formatTimeValue(s.LastFed), nil
+				}
+				return nil, nil
+			}},
+			"played": &graphql.Field{Type: graphql.Int, Resolve: func(p graphql.ResolveParams) (interface{}, error) {
+				if s, ok := sourceAs[models.TamaStat](p.Source); ok {
+					return s.Played, nil
+				}
+				return nil, nil
+			}},
+			"lastPlayed": &graphql.Field{Type: graphql.String, Resolve: func(p graphql.ResolveParams) (interface{}, error) {
+				if s, ok := sourceAs[models.TamaStat](p.Source); ok {
+					return formatTimeValue(s.LastPlayed), nil
 				}
 				return nil, nil
 			}},
 			"cleaned": &graphql.Field{Type: graphql.Int, Resolve: func(p graphql.ResolveParams) (interface{}, error) {
 				if s, ok := sourceAs[models.TamaStat](p.Source); ok {
 					return s.Cleaned, nil
+				}
+				return nil, nil
+			}},
+			"lastCleaned": &graphql.Field{Type: graphql.String, Resolve: func(p graphql.ResolveParams) (interface{}, error) {
+				if s, ok := sourceAs[models.TamaStat](p.Source); ok {
+					return formatTimeValue(s.LastCleaned), nil
+				}
+				return nil, nil
+			}},
+			"worked": &graphql.Field{Type: graphql.Int, Resolve: func(p graphql.ResolveParams) (interface{}, error) {
+				if s, ok := sourceAs[models.TamaStat](p.Source); ok {
+					return s.Worked, nil
+				}
+				return nil, nil
+			}},
+			"lastWorked": &graphql.Field{Type: graphql.String, Resolve: func(p graphql.ResolveParams) (interface{}, error) {
+				if s, ok := sourceAs[models.TamaStat](p.Source); ok {
+					return formatTimeValue(s.LastWorked), nil
+				}
+				return nil, nil
+			}},
+			"hunger": &graphql.Field{Type: graphql.Int, Resolve: func(p graphql.ResolveParams) (interface{}, error) {
+				if s, ok := sourceAs[models.TamaStat](p.Source); ok {
+					return s.Hunger, nil
+				}
+				return nil, nil
+			}},
+			"boredom": &graphql.Field{Type: graphql.Int, Resolve: func(p graphql.ResolveParams) (interface{}, error) {
+				if s, ok := sourceAs[models.TamaStat](p.Source); ok {
+					return s.Boredom, nil
+				}
+				return nil, nil
+			}},
+			"hygiene": &graphql.Field{Type: graphql.Int, Resolve: func(p graphql.ResolveParams) (interface{}, error) {
+				if s, ok := sourceAs[models.TamaStat](p.Source); ok {
+					return s.Hygiene, nil
+				}
+				return nil, nil
+			}},
+			"money": &graphql.Field{Type: graphql.Int, Resolve: func(p graphql.ResolveParams) (interface{}, error) {
+				if s, ok := sourceAs[models.TamaStat](p.Source); ok {
+					return s.Money, nil
 				}
 				return nil, nil
 			}},
@@ -786,9 +849,18 @@ func NewSchema(db *sqlx.DB) (graphql.Schema, error) {
 	createTamaStatInput := graphql.NewInputObject(graphql.InputObjectConfig{
 		Name: "CreateTamaStatInput",
 		Fields: graphql.InputObjectConfigFieldMap{
-			"food":          &graphql.InputObjectFieldConfig{Type: graphql.Int},
-			"play":          &graphql.InputObjectFieldConfig{Type: graphql.Int},
+			"fed":           &graphql.InputObjectFieldConfig{Type: graphql.Int},
+			"lastFed":       &graphql.InputObjectFieldConfig{Type: graphql.String},
+			"played":        &graphql.InputObjectFieldConfig{Type: graphql.Int},
+			"lastPlayed":    &graphql.InputObjectFieldConfig{Type: graphql.String},
 			"cleaned":       &graphql.InputObjectFieldConfig{Type: graphql.Int},
+			"lastCleaned":   &graphql.InputObjectFieldConfig{Type: graphql.String},
+			"worked":        &graphql.InputObjectFieldConfig{Type: graphql.Int},
+			"lastWorked":    &graphql.InputObjectFieldConfig{Type: graphql.String},
+			"hunger":        &graphql.InputObjectFieldConfig{Type: graphql.Int},
+			"boredom":       &graphql.InputObjectFieldConfig{Type: graphql.Int},
+			"hygiene":       &graphql.InputObjectFieldConfig{Type: graphql.Int},
+			"money":         &graphql.InputObjectFieldConfig{Type: graphql.Int},
 			"carAccident":   &graphql.InputObjectFieldConfig{Type: graphql.Int},
 			"workAccident":  &graphql.InputObjectFieldConfig{Type: graphql.Int},
 			"socialSatis":   &graphql.InputObjectFieldConfig{Type: graphql.Float},
@@ -1087,19 +1159,72 @@ func NewSchema(db *sqlx.DB) (graphql.Schema, error) {
 				Resolve: func(p graphql.ResolveParams) (interface{}, error) {
 					inputMap := p.Args["input"].(map[string]interface{})
 					input := CreateTamaStatInput{}
-					if v, ok := inputMap["food"]; ok {
+					if v, ok := inputMap["fed"]; ok {
 						if i, ok := v.(int); ok {
-							input.Food = i
+							input.Fed = i
 						}
 					}
-					if v, ok := inputMap["play"]; ok {
+					if v, ok := inputMap["lastFed"]; ok {
+						if s, ok := v.(string); ok && s != "" {
+							if t, err := time.Parse(time.RFC3339, s); err == nil {
+								input.LastFed = &t
+							}
+						}
+					}
+					if v, ok := inputMap["played"]; ok {
 						if i, ok := v.(int); ok {
-							input.Play = i
+							input.Played = i
+						}
+					}
+					if v, ok := inputMap["lastPlayed"]; ok {
+						if s, ok := v.(string); ok && s != "" {
+							if t, err := time.Parse(time.RFC3339, s); err == nil {
+								input.LastPlayed = &t
+							}
 						}
 					}
 					if v, ok := inputMap["cleaned"]; ok {
 						if i, ok := v.(int); ok {
 							input.Cleaned = i
+						}
+					}
+					if v, ok := inputMap["lastCleaned"]; ok {
+						if s, ok := v.(string); ok && s != "" {
+							if t, err := time.Parse(time.RFC3339, s); err == nil {
+								input.LastCleaned = &t
+							}
+						}
+					}
+					if v, ok := inputMap["worked"]; ok {
+						if i, ok := v.(int); ok {
+							input.Worked = i
+						}
+					}
+					if v, ok := inputMap["lastWorked"]; ok {
+						if s, ok := v.(string); ok && s != "" {
+							if t, err := time.Parse(time.RFC3339, s); err == nil {
+								input.LastWorked = &t
+							}
+						}
+					}
+					if v, ok := inputMap["hunger"]; ok {
+						if i, ok := v.(int); ok {
+							input.Hunger = i
+						}
+					}
+					if v, ok := inputMap["boredom"]; ok {
+						if i, ok := v.(int); ok {
+							input.Boredom = i
+						}
+					}
+					if v, ok := inputMap["hygiene"]; ok {
+						if i, ok := v.(int); ok {
+							input.Hygiene = i
+						}
+					}
+					if v, ok := inputMap["money"]; ok {
+						if i, ok := v.(int); ok {
+							input.Money = i
 						}
 					}
 					if v, ok := inputMap["carAccident"]; ok {
@@ -1140,19 +1265,72 @@ func NewSchema(db *sqlx.DB) (graphql.Schema, error) {
 					id := p.Args["id"].(int)
 					inputMap := p.Args["input"].(map[string]interface{})
 					input := CreateTamaStatInput{}
-					if v, ok := inputMap["food"]; ok {
+					if v, ok := inputMap["fed"]; ok {
 						if i, ok := v.(int); ok {
-							input.Food = i
+							input.Fed = i
 						}
 					}
-					if v, ok := inputMap["play"]; ok {
+					if v, ok := inputMap["lastFed"]; ok {
+						if s, ok := v.(string); ok && s != "" {
+							if t, err := time.Parse(time.RFC3339, s); err == nil {
+								input.LastFed = &t
+							}
+						}
+					}
+					if v, ok := inputMap["played"]; ok {
 						if i, ok := v.(int); ok {
-							input.Play = i
+							input.Played = i
+						}
+					}
+					if v, ok := inputMap["lastPlayed"]; ok {
+						if s, ok := v.(string); ok && s != "" {
+							if t, err := time.Parse(time.RFC3339, s); err == nil {
+								input.LastPlayed = &t
+							}
 						}
 					}
 					if v, ok := inputMap["cleaned"]; ok {
 						if i, ok := v.(int); ok {
 							input.Cleaned = i
+						}
+					}
+					if v, ok := inputMap["lastCleaned"]; ok {
+						if s, ok := v.(string); ok && s != "" {
+							if t, err := time.Parse(time.RFC3339, s); err == nil {
+								input.LastCleaned = &t
+							}
+						}
+					}
+					if v, ok := inputMap["worked"]; ok {
+						if i, ok := v.(int); ok {
+							input.Worked = i
+						}
+					}
+					if v, ok := inputMap["lastWorked"]; ok {
+						if s, ok := v.(string); ok && s != "" {
+							if t, err := time.Parse(time.RFC3339, s); err == nil {
+								input.LastWorked = &t
+							}
+						}
+					}
+					if v, ok := inputMap["hunger"]; ok {
+						if i, ok := v.(int); ok {
+							input.Hunger = i
+						}
+					}
+					if v, ok := inputMap["boredom"]; ok {
+						if i, ok := v.(int); ok {
+							input.Boredom = i
+						}
+					}
+					if v, ok := inputMap["hygiene"]; ok {
+						if i, ok := v.(int); ok {
+							input.Hygiene = i
+						}
+					}
+					if v, ok := inputMap["money"]; ok {
+						if i, ok := v.(int); ok {
+							input.Money = i
 						}
 					}
 					if v, ok := inputMap["carAccident"]; ok {
