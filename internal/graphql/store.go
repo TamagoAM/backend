@@ -79,6 +79,9 @@ type Store interface {
 	SponsorsByUser(ctx context.Context, userID int) ([]models.Sponsor, error)
 	SponsoredByUser(ctx context.Context, userID int) ([]models.Sponsor, error)
 	TamaStatsByUser(ctx context.Context, userID int) ([]models.TamaStat, error)
+
+	// Update last connection timestamp on login
+	UpdateLastConnection(ctx context.Context, userID int) error
 }
 
 type SQLStore struct {
@@ -87,6 +90,11 @@ type SQLStore struct {
 
 func NewSQLStore(db *sqlx.DB) *SQLStore {
 	return &SQLStore{db: db}
+}
+
+func (s *SQLStore) UpdateLastConnection(ctx context.Context, userID int) error {
+	_, err := s.db.ExecContext(ctx, `UPDATE Users SET LastConnectionDate = NOW() WHERE UserId = ?`, userID)
+	return err
 }
 
 func (s *SQLStore) ListUsers(ctx context.Context) ([]models.User, error) {

@@ -153,6 +153,11 @@ func main() {
 			return c.Status(401).JSON(fiber.Map{"error": "invalid credentials"})
 		}
 
+		// Update last connection timestamp
+		if err := store.UpdateLastConnection(c.Context(), user.UserID); err != nil {
+			log.Printf("warning: failed to update last connection: %v", err)
+		}
+
 		token, err := auth.GenerateToken(cfg.JWTSecret, user.UserID, user.UserName, user.ClearanceLevel)
 		if err != nil {
 			return c.Status(500).JSON(fiber.Map{"error": "failed to generate token"})
