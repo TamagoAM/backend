@@ -48,6 +48,9 @@ func main() {
 		if err := db.Migrate(dbConn, "migrations/005_seed_game_data.sql"); err != nil {
 			log.Fatalf("db migrate 005 failed: %v", err)
 		}
+		if err := db.Migrate(dbConn, "migrations/006_add_tama_traits.sql"); err != nil {
+			log.Fatalf("db migrate 006 failed: %v", err)
+		}
 	}
 	log.Println("db migrated")
 
