@@ -2411,7 +2411,7 @@ func formatDateValue(t *time.Time) interface{} {
 	if t == nil {
 		return nil
 	}
-	return t.UTC().Format("2006-01-02")
+	return t.UTC().Format(time.RFC3339)
 }
 
 func parseDateString(s string) (*time.Time, error) {
