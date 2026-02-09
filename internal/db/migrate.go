@@ -14,10 +14,11 @@ func Migrate(db *sqlx.DB, path string) error {
 		return err
 	}
 
-	// Split on semicolons and execute each statement individually.
-	// This gives better error messages and works around MySQL's
-	// single-statement Exec limitation.
-	stmts := strings.Split(string(content), ";")
+	// Split SQL into statements respecting quoted strings.
+	// A semicolon only counts as a statement terminator when it is
+	// outside single-quoted ('…') literals — this avoids breaking
+	// on semicolons that appear inside VARCHAR/TEXT values.
+	stmts := splitStatements(string(content))
 	for _, stmt := range stmts {
 		stmt = strings.TrimSpace(stmt)
 		if stmt == "" {
@@ -31,4 +32,41 @@ func Migrate(db *sqlx.DB, path string) error {
 		}
 	}
 	return nil
+}
+
+// splitStatements splits raw SQL on semicolons that are outside of
+// single-quoted string literals.  Escaped quotes (”) inside literals
+// are handled correctly.
+func splitStatements(sql string) []string {
+	var stmts []string
+	var buf strings.Builder
+	inQuote := false
+	for i := 0; i < len(sql); i++ {
+		ch := sql[i]
+		if ch == '\'' {
+			if inQuote {
+				// Check for escaped quote ('')
+				if i+1 < len(sql) && sql[i+1] == '\'' {
+					buf.WriteByte(ch)
+					buf.WriteByte(ch)
+					i++ // skip the second quote
+					continue
+				}
+				inQuote = false
+			} else {
+				inQuote = true
+			}
+			buf.WriteByte(ch)
+		} else if ch == ';' && !inQuote {
+			stmts = append(stmts, buf.String())
+			buf.Reset()
+		} else {
+			buf.WriteByte(ch)
+		}
+	}
+	// Remaining text after the last semicolon (if any)
+	if trailing := buf.String(); strings.TrimSpace(trailing) != "" {
+		stmts = append(stmts, trailing)
+	}
+	return stmts
 }
