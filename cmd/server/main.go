@@ -332,6 +332,30 @@ func main() {
 		return c.JSON(fiber.Map{"unread": count})
 	})
 
+	app.Get("/chat/conversations", jwtMiddleware, func(c *fiber.Ctx) error {
+		claims, ok := c.UserContext().Value(auth.UserClaimsKey).(*auth.Claims)
+		if !ok || claims == nil {
+			return c.Status(401).JSON(fiber.Map{"error": "authentication required"})
+		}
+		convos, err := chatHub.GetConversations(claims.UserID)
+		if err != nil {
+			return c.Status(500).JSON(fiber.Map{"error": err.Error()})
+		}
+		return c.JSON(convos)
+	})
+
+	app.Get("/chat/total-unread", jwtMiddleware, func(c *fiber.Ctx) error {
+		claims, ok := c.UserContext().Value(auth.UserClaimsKey).(*auth.Claims)
+		if !ok || claims == nil {
+			return c.Status(401).JSON(fiber.Map{"error": "authentication required"})
+		}
+		count, err := chatHub.GetTotalUnread(claims.UserID)
+		if err != nil {
+			return c.Status(500).JSON(fiber.Map{"error": err.Error()})
+		}
+		return c.JSON(fiber.Map{"unread": count})
+	})
+
 	log.Printf("listening on :%s", cfg.Port)
 	if err := app.Listen(":" + cfg.Port); err != nil {
 		log.Fatalf("server failed: %v", err)

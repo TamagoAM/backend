@@ -335,3 +335,91 @@ func (h *Hub) GetUnreadCount(receiverID, senderID int) (int, error) {
 	)
 	return count, err
 }
+
+// ─── Conversation list ─────────────────────────────────────
+
+// ConversationSummary is one row in the conversations list.
+type ConversationSummary struct {
+	FriendID    int        `db:"friendId"    json:"friendId"`
+	UserName    string     `db:"userName"    json:"userName"`
+	Name        string     `db:"name"        json:"name"`
+	LastMessage string     `db:"lastMessage" json:"lastMessage"`
+	LastTime    time.Time  `db:"lastTime"    json:"lastTime"`
+	Unread      int        `db:"unread"      json:"unread"`
+	Online      bool       `json:"online"`
+}
+
+// GetConversations returns all conversations for a user (friends + latest message + unread count).
+func (h *Hub) GetConversations(userID int) ([]ConversationSummary, error) {
+	// Step 1: Get all accepted friend IDs with user info
+	type friendRow struct {
+		FriendID int    `db:"friendId"`
+		UserName string `db:"userName"`
+		Name     string `db:"name"`
+	}
+	var friends []friendRow
+	err := h.db.SelectContext(h.ctx, &friends,
+		`SELECT
+		   CASE WHEN f.SenderID = ? THEN f.ReceiverID ELSE f.SenderID END AS friendId,
+		   u.UserName AS userName,
+		   u.Name     AS name
+		 FROM Friends f
+		 JOIN Users u ON u.UserID = CASE WHEN f.SenderID = ? THEN f.ReceiverID ELSE f.SenderID END
+		 WHERE f.Status = 'accepted' AND (f.SenderID = ? OR f.ReceiverID = ?)`,
+		userID, userID, userID, userID,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("get friends: %w", err)
+	}
+
+	convos := make([]ConversationSummary, 0, len(friends))
+	for _, fr := range friends {
+		// Last message between these two users
+		var lastMsg struct {
+			Body   string    `db:"Body"`
+			SentAt time.Time `db:"SentAt"`
+		}
+		hasMsg := true
+		err := h.db.GetContext(h.ctx, &lastMsg,
+			`SELECT Body, SentAt FROM ChatMessage
+			 WHERE (SenderID = ? AND ReceiverID = ?) OR (SenderID = ? AND ReceiverID = ?)
+			 ORDER BY SentAt DESC LIMIT 1`,
+			userID, fr.FriendID, fr.FriendID, userID,
+		)
+		if err != nil {
+			hasMsg = false
+		}
+
+		// Unread count from this friend
+		var unread int
+		_ = h.db.GetContext(h.ctx, &unread,
+			`SELECT COUNT(*) FROM ChatMessage WHERE ReceiverID = ? AND SenderID = ? AND ReadAt IS NULL`,
+			userID, fr.FriendID,
+		)
+
+		cs := ConversationSummary{
+			FriendID: fr.FriendID,
+			UserName: fr.UserName,
+			Name:     fr.Name,
+			Unread:   unread,
+			Online:   h.IsOnline(fr.FriendID),
+		}
+		if hasMsg {
+			cs.LastMessage = lastMsg.Body
+			cs.LastTime = lastMsg.SentAt
+		}
+		convos = append(convos, cs)
+	}
+
+	return convos, nil
+}
+
+// GetTotalUnread returns the total unread message count across all conversations.
+func (h *Hub) GetTotalUnread(userID int) (int, error) {
+	var count int
+	err := h.db.GetContext(h.ctx, &count,
+		`SELECT COUNT(*) FROM ChatMessage WHERE ReceiverID = ? AND ReadAt IS NULL`,
+		userID,
+	)
+	return count, err
+}
