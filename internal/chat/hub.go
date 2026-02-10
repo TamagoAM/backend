@@ -340,13 +340,13 @@ func (h *Hub) GetUnreadCount(receiverID, senderID int) (int, error) {
 
 // ConversationSummary is one row in the conversations list.
 type ConversationSummary struct {
-	FriendID    int        `db:"friendId"    json:"friendId"`
-	UserName    string     `db:"userName"    json:"userName"`
-	Name        string     `db:"name"        json:"name"`
-	LastMessage string     `db:"lastMessage" json:"lastMessage"`
-	LastTime    time.Time  `db:"lastTime"    json:"lastTime"`
-	Unread      int        `db:"unread"      json:"unread"`
-	Online      bool       `json:"online"`
+	FriendID    int       `db:"friendId"    json:"friendId"`
+	UserName    string    `db:"userName"    json:"userName"`
+	Name        string    `db:"name"        json:"name"`
+	LastMessage string    `db:"lastMessage" json:"lastMessage"`
+	LastTime    time.Time `db:"lastTime"    json:"lastTime"`
+	Unread      int       `db:"unread"      json:"unread"`
+	Online      bool      `json:"online"`
 }
 
 // GetConversations returns all conversations for a user (friends + latest message + unread count).

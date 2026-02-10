@@ -1,7 +1,11 @@
 -- ═══════════════════════════════════════════════════
 -- Drop all tables in reverse dependency order
 -- so foreign keys don't block the drops.
+-- Tables added by later migrations (006) must also
+-- be dropped here BEFORE the tables they reference.
 -- ═══════════════════════════════════════════════════
+SET FOREIGN_KEY_CHECKS = 0;
+DROP TABLE IF EXISTS ChatMessage;
 DROP TABLE IF EXISTS ActiveEvent;
 DROP TABLE IF EXISTS LifeChoices;
 DROP TABLE IF EXISTS Event;
@@ -15,6 +19,7 @@ DROP TABLE IF EXISTS Tama;
 DROP TABLE IF EXISTS Tama_stats;
 DROP TABLE IF EXISTS Race;
 DROP TABLE IF EXISTS Users;
+SET FOREIGN_KEY_CHECKS = 1;
 
 -- ═══════════════════════════════════════════════════
 -- Recreate everything from scratch

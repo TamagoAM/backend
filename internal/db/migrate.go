@@ -35,21 +35,59 @@ func Migrate(db *sqlx.DB, path string) error {
 }
 
 // splitStatements splits raw SQL on semicolons that are outside of
-// single-quoted string literals.  Escaped quotes (”) inside literals
-// are handled correctly.
+// single-quoted string literals and SQL comments (-- line comments
+// and /* block comments */).
 func splitStatements(sql string) []string {
 	var stmts []string
 	var buf strings.Builder
 	inQuote := false
+	inLineComment := false
+	inBlockComment := false
+
 	for i := 0; i < len(sql); i++ {
 		ch := sql[i]
+
+		// ── Line comment (-- until end of line) ──
+		if !inQuote && !inBlockComment && !inLineComment && ch == '-' && i+1 < len(sql) && sql[i+1] == '-' {
+			inLineComment = true
+			buf.WriteByte(ch)
+			continue
+		}
+		if inLineComment {
+			buf.WriteByte(ch)
+			if ch == '\n' {
+				inLineComment = false
+			}
+			continue
+		}
+
+		// ── Block comment (/* ... */) ──
+		if !inQuote && !inBlockComment && ch == '/' && i+1 < len(sql) && sql[i+1] == '*' {
+			inBlockComment = true
+			buf.WriteByte(ch)
+			buf.WriteByte(sql[i+1])
+			i++
+			continue
+		}
+		if inBlockComment {
+			if ch == '*' && i+1 < len(sql) && sql[i+1] == '/' {
+				inBlockComment = false
+				buf.WriteByte(ch)
+				buf.WriteByte(sql[i+1])
+				i++
+			} else {
+				buf.WriteByte(ch)
+			}
+			continue
+		}
+
+		// ── Single-quoted string ──
 		if ch == '\'' {
 			if inQuote {
-				// Check for escaped quote ('')
 				if i+1 < len(sql) && sql[i+1] == '\'' {
 					buf.WriteByte(ch)
 					buf.WriteByte(ch)
-					i++ // skip the second quote
+					i++
 					continue
 				}
 				inQuote = false
@@ -64,7 +102,6 @@ func splitStatements(sql string) []string {
 			buf.WriteByte(ch)
 		}
 	}
-	// Remaining text after the last semicolon (if any)
 	if trailing := buf.String(); strings.TrimSpace(trailing) != "" {
 		stmts = append(stmts, trailing)
 	}
