@@ -32,6 +32,13 @@ type OutgoingMessage struct {
 	ReadAt     string `json:"readAt,omitempty"`
 }
 
+// AdminMessage is sent from admin panel → player via WebSocket
+type AdminMessage struct {
+	Type    string          `json:"type"`    // "admin_money","admin_event","admin_stats","admin_sickness","admin_heal","admin_revive"
+	Payload json.RawMessage `json:"payload"` // action-specific data
+	Message string          `json:"message"` // human-readable summary
+}
+
 // ─── Hub ────────────────────────────────────────────────────
 
 type Hub struct {
@@ -79,6 +86,9 @@ func (h *Hub) Register(userID int, conn *websocket.Conn) {
 
 	// Broadcast online status to friends
 	h.broadcastPresence(userID, "online")
+
+	// Flush any pending admin notifications from while user was offline
+	go h.FlushPendingOnConnect(userID)
 }
 
 // Unregister a user
@@ -422,4 +432,134 @@ func (h *Hub) GetTotalUnread(userID int) (int, error) {
 		userID,
 	)
 	return count, err
+}
+
+// ─── Admin push ────────────────────────────────────────────
+
+// SendAdminPush delivers an admin action to a user via WebSocket.
+// If the user is offline, the notification is persisted to DB so it
+// can be fetched on reconnection.
+func (h *Hub) SendAdminPush(targetUserID int, msgType string, payload json.RawMessage, message string) (delivered bool, err error) {
+	// 1. Always persist to AdminNotification table (offline storage + audit log)
+	_, err = h.db.ExecContext(h.ctx,
+		`INSERT INTO AdminNotification (TargetUserId, Type, Payload, Message) VALUES (?, ?, ?, ?)`,
+		targetUserID, msgType, string(payload), message,
+	)
+	if err != nil {
+		log.Printf("[admin-push] failed to persist notification for user %d: %v", targetUserID, err)
+		return false, fmt.Errorf("persist notification: %w", err)
+	}
+
+	// 2. Try to deliver via WebSocket
+	adminMsg := AdminMessage{
+		Type:    msgType,
+		Payload: payload,
+		Message: message,
+	}
+
+	h.mu.RLock()
+	conn, online := h.clients[targetUserID]
+	h.mu.RUnlock()
+
+	if !online {
+		log.Printf("[admin-push] user %d offline, notification persisted for later", targetUserID)
+		return false, nil
+	}
+
+	data, _ := json.Marshal(adminMsg)
+	if writeErr := conn.WriteMessage(websocket.TextMessage, data); writeErr != nil {
+		log.Printf("[admin-push] ws write error to user %d: %v", targetUserID, writeErr)
+		return false, nil
+	}
+
+	log.Printf("[admin-push] delivered %s to user %d", msgType, targetUserID)
+	return true, nil
+}
+
+// SendAdminBroadcast delivers an admin message to ALL connected users and
+// persists notifications for offline ones.
+func (h *Hub) SendAdminBroadcast(msgType string, payload json.RawMessage, message string) (onlineCount int, err error) {
+	// Get all user IDs
+	var userIDs []int
+	err = h.db.SelectContext(h.ctx, &userIDs, `SELECT UserId FROM Users`)
+	if err != nil {
+		return 0, fmt.Errorf("list users: %w", err)
+	}
+
+	onlineCount = 0
+	for _, uid := range userIDs {
+		delivered, pushErr := h.SendAdminPush(uid, msgType, payload, message)
+		if pushErr != nil {
+			log.Printf("[admin-push] broadcast error for user %d: %v", uid, pushErr)
+			continue
+		}
+		if delivered {
+			onlineCount++
+		}
+	}
+	return onlineCount, nil
+}
+
+// GetPendingNotifications returns unread admin notifications for a user.
+func (h *Hub) GetPendingNotifications(userID int) ([]AdminNotificationRow, error) {
+	var rows []AdminNotificationRow
+	err := h.db.SelectContext(h.ctx, &rows,
+		`SELECT NotificationId, TargetUserId, Type, Payload, Message, CreatedAt, ReadAt
+		 FROM AdminNotification
+		 WHERE TargetUserId = ? AND ReadAt IS NULL
+		 ORDER BY CreatedAt DESC`,
+		userID,
+	)
+	return rows, err
+}
+
+// MarkNotificationsRead marks all unread notifications as read for a user.
+func (h *Hub) MarkNotificationsRead(userID int) error {
+	_, err := h.db.ExecContext(h.ctx,
+		`UPDATE AdminNotification SET ReadAt = NOW() WHERE TargetUserId = ? AND ReadAt IS NULL`,
+		userID,
+	)
+	return err
+}
+
+// AdminNotificationRow is a DB-mapped row from AdminNotification.
+type AdminNotificationRow struct {
+	NotificationID int        `db:"NotificationId" json:"notificationId"`
+	TargetUserID   int        `db:"TargetUserId"   json:"targetUserId"`
+	Type           string     `db:"Type"           json:"type"`
+	Payload        string     `db:"Payload"        json:"payload"`
+	Message        string     `db:"Message"        json:"message"`
+	CreatedAt      time.Time  `db:"CreatedAt"      json:"createdAt"`
+	ReadAt         *time.Time `db:"ReadAt"         json:"readAt"`
+}
+
+// FlushPendingOnConnect sends all pending admin notifications to a
+// user who just connected, then marks them as read.
+func (h *Hub) FlushPendingOnConnect(userID int) {
+	rows, err := h.GetPendingNotifications(userID)
+	if err != nil || len(rows) == 0 {
+		return
+	}
+
+	log.Printf("[admin-push] flushing %d pending notifications to user %d", len(rows), userID)
+
+	for _, row := range rows {
+		adminMsg := AdminMessage{
+			Type:    row.Type,
+			Payload: json.RawMessage(row.Payload),
+			Message: row.Message,
+		}
+		data, _ := json.Marshal(adminMsg)
+
+		h.mu.RLock()
+		conn, ok := h.clients[userID]
+		h.mu.RUnlock()
+
+		if ok {
+			_ = conn.WriteMessage(websocket.TextMessage, data)
+		}
+	}
+
+	// Mark all as read after delivery
+	_ = h.MarkNotificationsRead(userID)
 }

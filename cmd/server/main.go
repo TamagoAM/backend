@@ -2,6 +2,8 @@ package main
 
 import (
 	"context"
+	"encoding/json"
+	"fmt"
 	"log"
 	"net/http"
 	"strconv"
@@ -49,6 +51,9 @@ func main() {
 		}
 		if err := db.Migrate(dbConn, "migrations/006_friend_requests_chat.sql"); err != nil {
 			log.Fatalf("db migrate 006 failed: %v", err)
+		}
+		if err := db.Migrate(dbConn, "migrations/007_admin_notifications.sql"); err != nil {
+			log.Fatalf("db migrate 007 failed: %v", err)
 		}
 	}
 	log.Println("db migrated")
@@ -354,6 +359,299 @@ func main() {
 			return c.Status(500).JSON(fiber.Map{"error": err.Error()})
 		}
 		return c.JSON(fiber.Map{"unread": count})
+	})
+
+	// ─── Admin action endpoints (real-time push) ─────────────
+
+	// Require admin clearance (level >= 2)
+	adminMiddleware := func(c *fiber.Ctx) error {
+		claims, ok := c.UserContext().Value(auth.UserClaimsKey).(*auth.Claims)
+		if !ok || claims == nil {
+			return c.Status(401).JSON(fiber.Map{"error": "authentication required"})
+		}
+		if claims.ClearanceLevel < 2 {
+			return c.Status(403).JSON(fiber.Map{"error": "admin access required"})
+		}
+		return c.Next()
+	}
+
+	// POST /admin/give-money — atomically add money + push via WS
+	app.Post("/admin/give-money", jwtMiddleware, adminMiddleware, func(c *fiber.Ctx) error {
+		var body struct {
+			TamaStatsID  int `json:"tamaStatsId"`
+			TargetUserID int `json:"targetUserId"`
+			Amount       int `json:"amount"`
+		}
+		if err := c.BodyParser(&body); err != nil {
+			return c.Status(400).JSON(fiber.Map{"error": "invalid body"})
+		}
+		if body.Amount <= 0 || body.TamaStatsID == 0 || body.TargetUserID == 0 {
+			return c.Status(400).JSON(fiber.Map{"error": "amount, tamaStatsId, and targetUserId are required"})
+		}
+
+		// Atomic money update — no race condition
+		_, err := dbConn.ExecContext(c.Context(),
+			`UPDATE Tama_stats SET Money = Money + ? WHERE TamaStatId = ?`,
+			body.Amount, body.TamaStatsID)
+		if err != nil {
+			return c.Status(500).JSON(fiber.Map{"error": "db update failed: " + err.Error()})
+		}
+
+		// Read back new balance
+		var newBalance int
+		_ = dbConn.GetContext(c.Context(), &newBalance,
+			`SELECT Money FROM Tama_stats WHERE TamaStatId = ?`, body.TamaStatsID)
+
+		payload, _ := json.Marshal(fiber.Map{"amount": body.Amount, "newBalance": newBalance})
+		msg := fmt.Sprintf("💰 An admin gave you %d coins!", body.Amount)
+
+		delivered, _ := chatHub.SendAdminPush(body.TargetUserID, "admin_money", payload, msg)
+
+		return c.JSON(fiber.Map{
+			"success":    true,
+			"newBalance": newBalance,
+			"delivered":  delivered,
+		})
+	})
+
+	// POST /admin/send-event — create active event + push via WS
+	app.Post("/admin/send-event", jwtMiddleware, adminMiddleware, func(c *fiber.Ctx) error {
+		var body struct {
+			EventID      int  `json:"eventId"`
+			TargetUserID int  `json:"targetUserId"`
+			IsGlobal     bool `json:"isGlobal"`
+		}
+		if err := c.BodyParser(&body); err != nil {
+			return c.Status(400).JSON(fiber.Map{"error": "invalid body"})
+		}
+		if body.EventID == 0 {
+			return c.Status(400).JSON(fiber.Map{"error": "eventId is required"})
+		}
+
+		// Fetch event details for the payload
+		var ev struct {
+			Name     string  `db:"Name"`
+			Desc     *string `db:"Desc"`
+			Severity string  `db:"Severity"`
+			Bonus    *string `db:"Bonus"`
+			Malus    *string `db:"Malus"`
+		}
+		if err := dbConn.GetContext(c.Context(), &ev,
+			`SELECT Name, `+"`Desc`"+`, Severity, Bonus, Malus FROM Event WHERE EventId = ?`, body.EventID); err != nil {
+			return c.Status(404).JSON(fiber.Map{"error": "event not found"})
+		}
+
+		// Insert into ActiveEvent
+		var targetUID *int
+		if !body.IsGlobal {
+			targetUID = &body.TargetUserID
+		}
+		_, err := dbConn.ExecContext(c.Context(),
+			`INSERT INTO ActiveEvent (EventId, TargetUserId, IsGlobal) VALUES (?, ?, ?)`,
+			body.EventID, targetUID, body.IsGlobal)
+		if err != nil {
+			return c.Status(500).JSON(fiber.Map{"error": "db insert failed: " + err.Error()})
+		}
+
+		descStr := ""
+		if ev.Desc != nil {
+			descStr = *ev.Desc
+		}
+		bonusStr := ""
+		if ev.Bonus != nil {
+			bonusStr = *ev.Bonus
+		}
+		malusStr := ""
+		if ev.Malus != nil {
+			malusStr = *ev.Malus
+		}
+
+		payload, _ := json.Marshal(fiber.Map{
+			"eventId":  body.EventID,
+			"name":     ev.Name,
+			"desc":     descStr,
+			"severity": ev.Severity,
+			"bonus":    bonusStr,
+			"malus":    malusStr,
+		})
+		msg := fmt.Sprintf("🎭 Event: %s — %s", ev.Name, descStr)
+
+		var onlineCount int
+		var delivered bool
+		if body.IsGlobal {
+			onlineCount, _ = chatHub.SendAdminBroadcast("admin_event", payload, msg)
+		} else {
+			delivered, _ = chatHub.SendAdminPush(body.TargetUserID, "admin_event", payload, msg)
+		}
+
+		return c.JSON(fiber.Map{
+			"success":     true,
+			"isGlobal":    body.IsGlobal,
+			"delivered":   delivered,
+			"onlineCount": onlineCount,
+		})
+	})
+
+	// POST /admin/adjust-stats — apply stat deltas + push via WS
+	app.Post("/admin/adjust-stats", jwtMiddleware, adminMiddleware, func(c *fiber.Ctx) error {
+		var body struct {
+			TamaStatsID  int            `json:"tamaStatsId"`
+			TargetUserID int            `json:"targetUserId"`
+			Deltas       map[string]int `json:"deltas"` // {"hunger": 20, "boredom": -10, ...}
+		}
+		if err := c.BodyParser(&body); err != nil {
+			return c.Status(400).JSON(fiber.Map{"error": "invalid body"})
+		}
+		if body.TamaStatsID == 0 || body.TargetUserID == 0 || len(body.Deltas) == 0 {
+			return c.Status(400).JSON(fiber.Map{"error": "tamaStatsId, targetUserId, and deltas are required"})
+		}
+
+		// Build SET clauses for each delta — use GREATEST/LEAST to clamp 0-100
+		allowed := map[string]string{
+			"hunger": "Hunger", "boredom": "Boredom", "hygiene": "Hygiene",
+			"socialSatis": "SocialSatis", "workSatis": "WorkSatis", "personalSatis": "PersonalSatis",
+		}
+		sets := []string{}
+		args := []interface{}{}
+		for k, delta := range body.Deltas {
+			col, ok := allowed[k]
+			if !ok || delta == 0 {
+				continue
+			}
+			sets = append(sets, fmt.Sprintf("%s = GREATEST(0, LEAST(100, %s + ?))", col, col))
+			args = append(args, delta)
+		}
+		if len(sets) == 0 {
+			return c.Status(400).JSON(fiber.Map{"error": "no valid deltas"})
+		}
+
+		query := "UPDATE Tama_stats SET " + strings.Join(sets, ", ") + " WHERE TamaStatId = ?"
+		args = append(args, body.TamaStatsID)
+		_, err := dbConn.ExecContext(c.Context(), query, args...)
+		if err != nil {
+			return c.Status(500).JSON(fiber.Map{"error": "db update failed: " + err.Error()})
+		}
+
+		payload, _ := json.Marshal(fiber.Map{"deltas": body.Deltas})
+		msg := "📊 An admin adjusted your stats!"
+		delivered, _ := chatHub.SendAdminPush(body.TargetUserID, "admin_stats", payload, msg)
+
+		return c.JSON(fiber.Map{"success": true, "delivered": delivered})
+	})
+
+	// POST /admin/give-sickness — update tama sickness + push via WS
+	app.Post("/admin/give-sickness", jwtMiddleware, adminMiddleware, func(c *fiber.Ctx) error {
+		var body struct {
+			TamaID       int    `json:"tamaId"`
+			TargetUserID int    `json:"targetUserId"`
+			Sickness     string `json:"sickness"`
+		}
+		if err := c.BodyParser(&body); err != nil {
+			return c.Status(400).JSON(fiber.Map{"error": "invalid body"})
+		}
+		if body.TamaID == 0 || body.TargetUserID == 0 || body.Sickness == "" {
+			return c.Status(400).JSON(fiber.Map{"error": "tamaId, targetUserId, and sickness are required"})
+		}
+
+		_, err := dbConn.ExecContext(c.Context(),
+			`UPDATE Tama SET Sickness = ? WHERE TamaId = ?`, body.Sickness, body.TamaID)
+		if err != nil {
+			return c.Status(500).JSON(fiber.Map{"error": "db update failed: " + err.Error()})
+		}
+
+		payload, _ := json.Marshal(fiber.Map{"sickness": body.Sickness})
+		msg := fmt.Sprintf("🦠 Your tama caught %s!", body.Sickness)
+		delivered, _ := chatHub.SendAdminPush(body.TargetUserID, "admin_sickness", payload, msg)
+
+		return c.JSON(fiber.Map{"success": true, "delivered": delivered})
+	})
+
+	// POST /admin/heal — remove sickness + push via WS
+	app.Post("/admin/heal", jwtMiddleware, adminMiddleware, func(c *fiber.Ctx) error {
+		var body struct {
+			TamaID       int    `json:"tamaId"`
+			TargetUserID int    `json:"targetUserId"`
+			OldSickness  string `json:"oldSickness"`
+		}
+		if err := c.BodyParser(&body); err != nil {
+			return c.Status(400).JSON(fiber.Map{"error": "invalid body"})
+		}
+		if body.TamaID == 0 || body.TargetUserID == 0 {
+			return c.Status(400).JSON(fiber.Map{"error": "tamaId and targetUserId are required"})
+		}
+
+		_, err := dbConn.ExecContext(c.Context(),
+			`UPDATE Tama SET Sickness = NULL WHERE TamaId = ?`, body.TamaID)
+		if err != nil {
+			return c.Status(500).JSON(fiber.Map{"error": "db update failed: " + err.Error()})
+		}
+
+		payload, _ := json.Marshal(fiber.Map{"healed": true, "oldSickness": body.OldSickness})
+		msg := fmt.Sprintf("💊 An admin cured your %s!", body.OldSickness)
+		delivered, _ := chatHub.SendAdminPush(body.TargetUserID, "admin_heal", payload, msg)
+
+		return c.JSON(fiber.Map{"success": true, "delivered": delivered})
+	})
+
+	// POST /admin/revive — revive dead tama + reset stats + push via WS
+	app.Post("/admin/revive", jwtMiddleware, adminMiddleware, func(c *fiber.Ctx) error {
+		var body struct {
+			TamaID       int `json:"tamaId"`
+			TamaStatsID  int `json:"tamaStatsId"`
+			TargetUserID int `json:"targetUserId"`
+		}
+		if err := c.BodyParser(&body); err != nil {
+			return c.Status(400).JSON(fiber.Map{"error": "invalid body"})
+		}
+		if body.TamaID == 0 || body.TamaStatsID == 0 || body.TargetUserID == 0 {
+			return c.Status(400).JSON(fiber.Map{"error": "tamaId, tamaStatsId, and targetUserId are required"})
+		}
+
+		// Clear death info
+		_, err := dbConn.ExecContext(c.Context(),
+			`UPDATE Tama SET DeathDay = NULL, CauseOfDeath = NULL, Sickness = NULL WHERE TamaId = ?`, body.TamaID)
+		if err != nil {
+			return c.Status(500).JSON(fiber.Map{"error": "tama update failed: " + err.Error()})
+		}
+
+		// Reset stats to healthy values
+		_, err = dbConn.ExecContext(c.Context(),
+			`UPDATE Tama_stats SET Hunger = 70, Boredom = 30, Hygiene = 80, SocialSatis = 50, WorkSatis = 50, PersonalSatis = 50 WHERE TamaStatId = ?`,
+			body.TamaStatsID)
+		if err != nil {
+			return c.Status(500).JSON(fiber.Map{"error": "stats update failed: " + err.Error()})
+		}
+
+		payload, _ := json.Marshal(fiber.Map{"revived": true})
+		msg := "✨ An admin revived your tama!"
+		delivered, _ := chatHub.SendAdminPush(body.TargetUserID, "admin_revive", payload, msg)
+
+		return c.JSON(fiber.Map{"success": true, "delivered": delivered})
+	})
+
+	// GET /admin/notifications — get pending notifications for current user
+	app.Get("/admin/notifications", jwtMiddleware, func(c *fiber.Ctx) error {
+		claims, ok := c.UserContext().Value(auth.UserClaimsKey).(*auth.Claims)
+		if !ok || claims == nil {
+			return c.Status(401).JSON(fiber.Map{"error": "authentication required"})
+		}
+		rows, err := chatHub.GetPendingNotifications(claims.UserID)
+		if err != nil {
+			return c.Status(500).JSON(fiber.Map{"error": err.Error()})
+		}
+		return c.JSON(rows)
+	})
+
+	// POST /admin/notifications/read — mark all notifications as read
+	app.Post("/admin/notifications/read", jwtMiddleware, func(c *fiber.Ctx) error {
+		claims, ok := c.UserContext().Value(auth.UserClaimsKey).(*auth.Claims)
+		if !ok || claims == nil {
+			return c.Status(401).JSON(fiber.Map{"error": "authentication required"})
+		}
+		if err := chatHub.MarkNotificationsRead(claims.UserID); err != nil {
+			return c.Status(500).JSON(fiber.Map{"error": err.Error()})
+		}
+		return c.JSON(fiber.Map{"success": true})
 	})
 
 	log.Printf("listening on :%s", cfg.Port)

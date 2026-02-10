@@ -153,3 +153,13 @@ type ActiveEvent struct {
 	TriggeredBy   *int       `db:"TriggeredBy"`
 	IsGlobal      bool       `db:"IsGlobal"`
 }
+
+type AdminNotification struct {
+	NotificationID int        `db:"NotificationId"`
+	TargetUserID   int        `db:"TargetUserId"`
+	Type           string     `db:"Type"`
+	Payload        string     `db:"Payload"`
+	Message        string     `db:"Message"`
+	CreatedAt      time.Time  `db:"CreatedAt"`
+	ReadAt         *time.Time `db:"ReadAt"`
+}
