@@ -55,6 +55,9 @@ func main() {
 		if err := db.Migrate(dbConn, "migrations/007_admin_notifications.sql"); err != nil {
 			log.Fatalf("db migrate 007 failed: %v", err)
 		}
+		if err := db.Migrate(dbConn, "migrations/008_life_choice_options.sql"); err != nil {
+			log.Fatalf("db migrate 008 failed: %v", err)
+		}
 	}
 	log.Println("db migrated")
 

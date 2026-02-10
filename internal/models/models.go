@@ -163,3 +163,22 @@ type AdminNotification struct {
 	CreatedAt      time.Time  `db:"CreatedAt"`
 	ReadAt         *time.Time `db:"ReadAt"`
 }
+
+type LifeChoiceOption struct {
+	OptionID      int     `db:"OptionId"`
+	LifeChoicesID int     `db:"LifeChoicesId"`
+	Label         string  `db:"Label"`
+	Desc          *string `db:"Desc"`
+	Traits        *string `db:"Traits"`
+	Bonus         *string `db:"Bonus"`
+	Malus         *string `db:"Malus"`
+}
+
+type TamaLifeChoiceHistory struct {
+	HistoryID      int       `db:"HistoryId"`
+	TamaID         int       `db:"TamaId"`
+	LifeChoicesID  int       `db:"LifeChoicesId"`
+	ChosenOptionID *int      `db:"ChosenOptionId"`
+	Action         string    `db:"Action"`
+	CreatedAt      time.Time `db:"CreatedAt"`
+}

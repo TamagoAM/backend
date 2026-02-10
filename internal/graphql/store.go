@@ -769,3 +769,80 @@ func (s *SQLStore) GlobalActiveEvents(ctx context.Context) ([]models.ActiveEvent
 	err := s.db.SelectContext(ctx, &events, "SELECT * FROM ActiveEvent WHERE IsGlobal = TRUE ORDER BY StartDate DESC")
 	return events, err
 }
+
+// ─── LifeChoiceOption CRUD ─────────────────────────────
+
+func (s *SQLStore) ListOptionsByChoice(ctx context.Context, lifeChoicesID int) ([]models.LifeChoiceOption, error) {
+	var opts []models.LifeChoiceOption
+	err := s.db.SelectContext(ctx, &opts, "SELECT * FROM LifeChoiceOption WHERE LifeChoicesId = ? ORDER BY OptionId", lifeChoicesID)
+	return opts, err
+}
+
+func (s *SQLStore) ListAllOptions(ctx context.Context) ([]models.LifeChoiceOption, error) {
+	var opts []models.LifeChoiceOption
+	err := s.db.SelectContext(ctx, &opts, "SELECT * FROM LifeChoiceOption ORDER BY LifeChoicesId, OptionId")
+	return opts, err
+}
+
+func (s *SQLStore) GetOption(ctx context.Context, id int) (*models.LifeChoiceOption, error) {
+	var opt models.LifeChoiceOption
+	err := s.db.GetContext(ctx, &opt, "SELECT * FROM LifeChoiceOption WHERE OptionId = ?", id)
+	if err != nil {
+		return nil, err
+	}
+	return &opt, nil
+}
+
+func (s *SQLStore) CreateOption(ctx context.Context, input CreateLifeChoiceOptionInput) (*models.LifeChoiceOption, error) {
+	res, err := s.db.ExecContext(ctx, "INSERT INTO LifeChoiceOption (LifeChoicesId, Label, `Desc`, Traits, Bonus, Malus) VALUES (?, ?, ?, ?, ?, ?)", input.LifeChoicesID, input.Label, input.Desc, input.Traits, input.Bonus, input.Malus)
+	if err != nil {
+		return nil, err
+	}
+	id, err := res.LastInsertId()
+	if err != nil {
+		return nil, err
+	}
+	return s.GetOption(ctx, int(id))
+}
+
+func (s *SQLStore) UpdateOption(ctx context.Context, id int, input CreateLifeChoiceOptionInput) (*models.LifeChoiceOption, error) {
+	_, err := s.db.ExecContext(ctx, "UPDATE LifeChoiceOption SET LifeChoicesId = ?, Label = ?, `Desc` = ?, Traits = ?, Bonus = ?, Malus = ? WHERE OptionId = ?", input.LifeChoicesID, input.Label, input.Desc, input.Traits, input.Bonus, input.Malus, id)
+	if err != nil {
+		return nil, err
+	}
+	return s.GetOption(ctx, id)
+}
+
+func (s *SQLStore) DeleteOption(ctx context.Context, id int) (bool, error) {
+	res, err := s.db.ExecContext(ctx, "DELETE FROM LifeChoiceOption WHERE OptionId = ?", id)
+	if err != nil {
+		return false, err
+	}
+	rows, _ := res.RowsAffected()
+	return rows > 0, nil
+}
+
+// ─── TamaLifeChoiceHistory CRUD ────────────────────────
+
+func (s *SQLStore) CreateHistory(ctx context.Context, input CreateLifeChoiceHistoryInput) (*models.TamaLifeChoiceHistory, error) {
+	res, err := s.db.ExecContext(ctx, "INSERT INTO TamaLifeChoiceHistory (TamaId, LifeChoicesId, ChosenOptionId, Action) VALUES (?, ?, ?, ?)", input.TamaID, input.LifeChoicesID, input.ChosenOptionID, input.Action)
+	if err != nil {
+		return nil, err
+	}
+	id, err := res.LastInsertId()
+	if err != nil {
+		return nil, err
+	}
+	var h models.TamaLifeChoiceHistory
+	err = s.db.GetContext(ctx, &h, "SELECT * FROM TamaLifeChoiceHistory WHERE HistoryId = ?", id)
+	if err != nil {
+		return nil, err
+	}
+	return &h, nil
+}
+
+func (s *SQLStore) ListHistoryByTama(ctx context.Context, tamaID int) ([]models.TamaLifeChoiceHistory, error) {
+	var hist []models.TamaLifeChoiceHistory
+	err := s.db.SelectContext(ctx, &hist, "SELECT * FROM TamaLifeChoiceHistory WHERE TamaId = ? ORDER BY CreatedAt DESC", tamaID)
+	return hist, err
+}

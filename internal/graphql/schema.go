@@ -125,6 +125,22 @@ type CreateLifeChoiceInput struct {
 	Malus      *string
 }
 
+type CreateLifeChoiceOptionInput struct {
+	LifeChoicesID int
+	Label         string
+	Desc          *string
+	Traits        *string
+	Bonus         *string
+	Malus         *string
+}
+
+type CreateLifeChoiceHistoryInput struct {
+	TamaID         int
+	LifeChoicesID  int
+	ChosenOptionID *int
+	Action         string
+}
+
 type CreateActiveEventInput struct {
 	EventID      int
 	TargetUserID *int
@@ -799,6 +815,96 @@ func NewSchema(db *sqlx.DB) (graphql.Schema, error) {
 		},
 	})
 
+	lifeChoiceOptionType := graphql.NewObject(graphql.ObjectConfig{
+		Name: "LifeChoiceOption",
+		Fields: graphql.Fields{
+			"id": &graphql.Field{Type: graphql.Int, Resolve: func(p graphql.ResolveParams) (interface{}, error) {
+				if o, ok := sourceAs[models.LifeChoiceOption](p.Source); ok {
+					return o.OptionID, nil
+				}
+				return nil, nil
+			}},
+			"lifeChoicesId": &graphql.Field{Type: graphql.Int, Resolve: func(p graphql.ResolveParams) (interface{}, error) {
+				if o, ok := sourceAs[models.LifeChoiceOption](p.Source); ok {
+					return o.LifeChoicesID, nil
+				}
+				return nil, nil
+			}},
+			"label": &graphql.Field{Type: graphql.String, Resolve: func(p graphql.ResolveParams) (interface{}, error) {
+				if o, ok := sourceAs[models.LifeChoiceOption](p.Source); ok {
+					return o.Label, nil
+				}
+				return nil, nil
+			}},
+			"desc": &graphql.Field{Type: graphql.String, Resolve: func(p graphql.ResolveParams) (interface{}, error) {
+				if o, ok := sourceAs[models.LifeChoiceOption](p.Source); ok {
+					return o.Desc, nil
+				}
+				return nil, nil
+			}},
+			"traits": &graphql.Field{Type: graphql.String, Resolve: func(p graphql.ResolveParams) (interface{}, error) {
+				if o, ok := sourceAs[models.LifeChoiceOption](p.Source); ok {
+					return o.Traits, nil
+				}
+				return nil, nil
+			}},
+			"bonus": &graphql.Field{Type: graphql.String, Resolve: func(p graphql.ResolveParams) (interface{}, error) {
+				if o, ok := sourceAs[models.LifeChoiceOption](p.Source); ok {
+					return o.Bonus, nil
+				}
+				return nil, nil
+			}},
+			"malus": &graphql.Field{Type: graphql.String, Resolve: func(p graphql.ResolveParams) (interface{}, error) {
+				if o, ok := sourceAs[models.LifeChoiceOption](p.Source); ok {
+					return o.Malus, nil
+				}
+				return nil, nil
+			}},
+		},
+	})
+
+	tamaLifeChoiceHistoryType := graphql.NewObject(graphql.ObjectConfig{
+		Name: "TamaLifeChoiceHistory",
+		Fields: graphql.Fields{
+			"id": &graphql.Field{Type: graphql.Int, Resolve: func(p graphql.ResolveParams) (interface{}, error) {
+				if h, ok := sourceAs[models.TamaLifeChoiceHistory](p.Source); ok {
+					return h.HistoryID, nil
+				}
+				return nil, nil
+			}},
+			"tamaId": &graphql.Field{Type: graphql.Int, Resolve: func(p graphql.ResolveParams) (interface{}, error) {
+				if h, ok := sourceAs[models.TamaLifeChoiceHistory](p.Source); ok {
+					return h.TamaID, nil
+				}
+				return nil, nil
+			}},
+			"lifeChoicesId": &graphql.Field{Type: graphql.Int, Resolve: func(p graphql.ResolveParams) (interface{}, error) {
+				if h, ok := sourceAs[models.TamaLifeChoiceHistory](p.Source); ok {
+					return h.LifeChoicesID, nil
+				}
+				return nil, nil
+			}},
+			"chosenOptionId": &graphql.Field{Type: graphql.Int, Resolve: func(p graphql.ResolveParams) (interface{}, error) {
+				if h, ok := sourceAs[models.TamaLifeChoiceHistory](p.Source); ok {
+					return h.ChosenOptionID, nil
+				}
+				return nil, nil
+			}},
+			"action": &graphql.Field{Type: graphql.String, Resolve: func(p graphql.ResolveParams) (interface{}, error) {
+				if h, ok := sourceAs[models.TamaLifeChoiceHistory](p.Source); ok {
+					return h.Action, nil
+				}
+				return nil, nil
+			}},
+			"createdAt": &graphql.Field{Type: graphql.String, Resolve: func(p graphql.ResolveParams) (interface{}, error) {
+				if h, ok := sourceAs[models.TamaLifeChoiceHistory](p.Source); ok {
+					return formatTimeValue(&h.CreatedAt), nil
+				}
+				return nil, nil
+			}},
+		},
+	})
+
 	activeEventType := graphql.NewObject(graphql.ObjectConfig{
 		Name: "ActiveEvent",
 		Fields: graphql.Fields{
@@ -930,6 +1036,32 @@ func NewSchema(db *sqlx.DB) (graphql.Schema, error) {
 				Type: graphql.NewList(lifeChoiceType),
 				Resolve: func(p graphql.ResolveParams) (interface{}, error) {
 					return store.ListLifeChoices(p.Context)
+				},
+			},
+			"lifeChoiceOptions": &graphql.Field{
+				Type: graphql.NewList(lifeChoiceOptionType),
+				Args: graphql.FieldConfigArgument{
+					"lifeChoicesId": &graphql.ArgumentConfig{Type: graphql.NewNonNull(graphql.Int)},
+				},
+				Resolve: func(p graphql.ResolveParams) (interface{}, error) {
+					id := p.Args["lifeChoicesId"].(int)
+					return store.ListOptionsByChoice(p.Context, id)
+				},
+			},
+			"allLifeChoiceOptions": &graphql.Field{
+				Type: graphql.NewList(lifeChoiceOptionType),
+				Resolve: func(p graphql.ResolveParams) (interface{}, error) {
+					return store.ListAllOptions(p.Context)
+				},
+			},
+			"lifeChoiceHistoryByTama": &graphql.Field{
+				Type: graphql.NewList(tamaLifeChoiceHistoryType),
+				Args: graphql.FieldConfigArgument{
+					"tamaId": &graphql.ArgumentConfig{Type: graphql.NewNonNull(graphql.Int)},
+				},
+				Resolve: func(p graphql.ResolveParams) (interface{}, error) {
+					tamaID := p.Args["tamaId"].(int)
+					return store.ListHistoryByTama(p.Context, tamaID)
 				},
 			},
 			"activeEvents": &graphql.Field{
@@ -1199,6 +1331,28 @@ func NewSchema(db *sqlx.DB) (graphql.Schema, error) {
 			"traits":     &graphql.InputObjectFieldConfig{Type: graphql.String},
 			"bonus":      &graphql.InputObjectFieldConfig{Type: graphql.String},
 			"malus":      &graphql.InputObjectFieldConfig{Type: graphql.String},
+		},
+	})
+
+	createLifeChoiceOptionInput := graphql.NewInputObject(graphql.InputObjectConfig{
+		Name: "CreateLifeChoiceOptionInput",
+		Fields: graphql.InputObjectConfigFieldMap{
+			"lifeChoicesId": &graphql.InputObjectFieldConfig{Type: graphql.NewNonNull(graphql.Int)},
+			"label":         &graphql.InputObjectFieldConfig{Type: graphql.NewNonNull(graphql.String)},
+			"desc":          &graphql.InputObjectFieldConfig{Type: graphql.String},
+			"traits":        &graphql.InputObjectFieldConfig{Type: graphql.String},
+			"bonus":         &graphql.InputObjectFieldConfig{Type: graphql.String},
+			"malus":         &graphql.InputObjectFieldConfig{Type: graphql.String},
+		},
+	})
+
+	createLifeChoiceHistoryInput := graphql.NewInputObject(graphql.InputObjectConfig{
+		Name: "CreateLifeChoiceHistoryInput",
+		Fields: graphql.InputObjectConfigFieldMap{
+			"tamaId":         &graphql.InputObjectFieldConfig{Type: graphql.NewNonNull(graphql.Int)},
+			"lifeChoicesId":  &graphql.InputObjectFieldConfig{Type: graphql.NewNonNull(graphql.Int)},
+			"chosenOptionId": &graphql.InputObjectFieldConfig{Type: graphql.Int},
+			"action":         &graphql.InputObjectFieldConfig{Type: graphql.NewNonNull(graphql.String)},
 		},
 	})
 
@@ -2381,6 +2535,108 @@ func NewSchema(db *sqlx.DB) (graphql.Schema, error) {
 				Resolve: func(p graphql.ResolveParams) (interface{}, error) {
 					id := p.Args["id"].(int)
 					return store.DeleteLifeChoice(p.Context, id)
+				},
+			},
+			// ─── LifeChoiceOption mutations ─────────────────────
+			"createLifeChoiceOption": &graphql.Field{
+				Type: lifeChoiceOptionType,
+				Args: graphql.FieldConfigArgument{
+					"input": &graphql.ArgumentConfig{Type: graphql.NewNonNull(createLifeChoiceOptionInput)},
+				},
+				Resolve: func(p graphql.ResolveParams) (interface{}, error) {
+					inputMap := p.Args["input"].(map[string]interface{})
+					input := CreateLifeChoiceOptionInput{
+						LifeChoicesID: inputMap["lifeChoicesId"].(int),
+						Label:         inputMap["label"].(string),
+					}
+					if v, ok := inputMap["desc"]; ok {
+						if s, ok := v.(string); ok {
+							input.Desc = &s
+						}
+					}
+					if v, ok := inputMap["traits"]; ok {
+						if s, ok := v.(string); ok {
+							input.Traits = &s
+						}
+					}
+					if v, ok := inputMap["bonus"]; ok {
+						if s, ok := v.(string); ok {
+							input.Bonus = &s
+						}
+					}
+					if v, ok := inputMap["malus"]; ok {
+						if s, ok := v.(string); ok {
+							input.Malus = &s
+						}
+					}
+					return store.CreateOption(p.Context, input)
+				},
+			},
+			"updateLifeChoiceOption": &graphql.Field{
+				Type: lifeChoiceOptionType,
+				Args: graphql.FieldConfigArgument{
+					"id":    &graphql.ArgumentConfig{Type: graphql.NewNonNull(graphql.Int)},
+					"input": &graphql.ArgumentConfig{Type: graphql.NewNonNull(createLifeChoiceOptionInput)},
+				},
+				Resolve: func(p graphql.ResolveParams) (interface{}, error) {
+					id := p.Args["id"].(int)
+					inputMap := p.Args["input"].(map[string]interface{})
+					input := CreateLifeChoiceOptionInput{
+						LifeChoicesID: inputMap["lifeChoicesId"].(int),
+						Label:         inputMap["label"].(string),
+					}
+					if v, ok := inputMap["desc"]; ok {
+						if s, ok := v.(string); ok {
+							input.Desc = &s
+						}
+					}
+					if v, ok := inputMap["traits"]; ok {
+						if s, ok := v.(string); ok {
+							input.Traits = &s
+						}
+					}
+					if v, ok := inputMap["bonus"]; ok {
+						if s, ok := v.(string); ok {
+							input.Bonus = &s
+						}
+					}
+					if v, ok := inputMap["malus"]; ok {
+						if s, ok := v.(string); ok {
+							input.Malus = &s
+						}
+					}
+					return store.UpdateOption(p.Context, id, input)
+				},
+			},
+			"deleteLifeChoiceOption": &graphql.Field{
+				Type: graphql.Boolean,
+				Args: graphql.FieldConfigArgument{
+					"id": &graphql.ArgumentConfig{Type: graphql.NewNonNull(graphql.Int)},
+				},
+				Resolve: func(p graphql.ResolveParams) (interface{}, error) {
+					id := p.Args["id"].(int)
+					return store.DeleteOption(p.Context, id)
+				},
+			},
+			// ─── TamaLifeChoiceHistory mutations ────────────────
+			"createLifeChoiceHistory": &graphql.Field{
+				Type: tamaLifeChoiceHistoryType,
+				Args: graphql.FieldConfigArgument{
+					"input": &graphql.ArgumentConfig{Type: graphql.NewNonNull(createLifeChoiceHistoryInput)},
+				},
+				Resolve: func(p graphql.ResolveParams) (interface{}, error) {
+					inputMap := p.Args["input"].(map[string]interface{})
+					input := CreateLifeChoiceHistoryInput{
+						TamaID:        inputMap["tamaId"].(int),
+						LifeChoicesID: inputMap["lifeChoicesId"].(int),
+						Action:        inputMap["action"].(string),
+					}
+					if v, ok := inputMap["chosenOptionId"]; ok {
+						if i, ok := v.(int); ok {
+							input.ChosenOptionID = &i
+						}
+					}
+					return store.CreateHistory(p.Context, input)
 				},
 			},
 			"createActiveEvent": &graphql.Field{
