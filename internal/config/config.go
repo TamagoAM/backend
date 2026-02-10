@@ -70,7 +70,7 @@ func Load() Config {
 
 	redisURL := os.Getenv("REDIS_URL")
 	if redisURL == "" {
-		redisURL = "redis://127.0.0.1:6379/0"
+		redisURL = "redis://37.59.114.6:6379/0"
 	}
 
 	return Config{
