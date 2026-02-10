@@ -440,17 +440,7 @@ func (h *Hub) GetTotalUnread(userID int) (int, error) {
 // If the user is offline, the notification is persisted to DB so it
 // can be fetched on reconnection.
 func (h *Hub) SendAdminPush(targetUserID int, msgType string, payload json.RawMessage, message string) (delivered bool, err error) {
-	// 1. Always persist to AdminNotification table (offline storage + audit log)
-	_, err = h.db.ExecContext(h.ctx,
-		`INSERT INTO AdminNotification (TargetUserId, Type, Payload, Message) VALUES (?, ?, ?, ?)`,
-		targetUserID, msgType, string(payload), message,
-	)
-	if err != nil {
-		log.Printf("[admin-push] failed to persist notification for user %d: %v", targetUserID, err)
-		return false, fmt.Errorf("persist notification: %w", err)
-	}
-
-	// 2. Try to deliver via WebSocket
+	// 1. Try to deliver via WebSocket first
 	adminMsg := AdminMessage{
 		Type:    msgType,
 		Payload: payload,
@@ -461,19 +451,29 @@ func (h *Hub) SendAdminPush(targetUserID int, msgType string, payload json.RawMe
 	conn, online := h.clients[targetUserID]
 	h.mu.RUnlock()
 
-	if !online {
-		log.Printf("[admin-push] user %d offline, notification persisted for later", targetUserID)
-		return false, nil
+	if online {
+		data, _ := json.Marshal(adminMsg)
+		if writeErr := conn.WriteMessage(websocket.TextMessage, data); writeErr != nil {
+			log.Printf("[admin-push] ws write error to user %d: %v", targetUserID, writeErr)
+			// Fall through to persist for later
+		} else {
+			log.Printf("[admin-push] delivered %s to user %d", msgType, targetUserID)
+			return true, nil
+		}
 	}
 
-	data, _ := json.Marshal(adminMsg)
-	if writeErr := conn.WriteMessage(websocket.TextMessage, data); writeErr != nil {
-		log.Printf("[admin-push] ws write error to user %d: %v", targetUserID, writeErr)
-		return false, nil
+	// 2. User is offline (or WS write failed) — persist for later delivery on reconnect
+	_, err = h.db.ExecContext(h.ctx,
+		`INSERT INTO AdminNotification (TargetUserId, Type, Payload, Message) VALUES (?, ?, ?, ?)`,
+		targetUserID, msgType, string(payload), message,
+	)
+	if err != nil {
+		log.Printf("[admin-push] failed to persist notification for user %d: %v", targetUserID, err)
+		return false, fmt.Errorf("persist notification: %w", err)
 	}
 
-	log.Printf("[admin-push] delivered %s to user %d", msgType, targetUserID)
-	return true, nil
+	log.Printf("[admin-push] user %d offline, notification persisted for later", targetUserID)
+	return false, nil
 }
 
 // SendAdminBroadcast delivers an admin message to ALL connected users and
