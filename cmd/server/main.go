@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"log"
+	"net/http"
 	"strconv"
 	"strings"
 
@@ -241,7 +242,24 @@ func main() {
 		GraphiQL: true,
 	})
 
-	app.Post("/graphql", jwtMiddleware, adaptor.HTTPHandler(gqlHandler))
+	// Wrap the GraphQL handler so that the JWT claims stored in
+	// c.UserContext() are forwarded into the http.Request.Context()
+	// that the graphql-go resolver receives as p.Context.
+	// adaptor.HTTPHandler does NOT do this automatically.
+	gqlFiberHandler := func(c *fiber.Ctx) error {
+		var httpHandler http.Handler = http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			// Merge the Fiber user-context (with JWT claims) into the http.Request
+			if userCtx := c.UserContext(); userCtx != nil {
+				if claims, ok := userCtx.Value(auth.UserClaimsKey).(*auth.Claims); ok && claims != nil {
+					r = r.WithContext(context.WithValue(r.Context(), auth.UserClaimsKey, claims))
+				}
+			}
+			gqlHandler.ServeHTTP(w, r)
+		})
+		return adaptor.HTTPHandler(httpHandler)(c)
+	}
+
+	app.Post("/graphql", jwtMiddleware, gqlFiberHandler)
 	app.Get("/playground", adaptor.HTTPHandler(playgroundHandler))
 
 	// ─── WebSocket for real-time chat ─────────────────────────
