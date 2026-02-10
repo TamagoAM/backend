@@ -257,6 +257,7 @@ func (h *Hub) deliverToUser(userID int, msg OutgoingMessage) {
 	h.mu.RUnlock()
 
 	if !ok {
+		log.Printf("[chat] user %d not connected, skipping delivery", userID)
 		return // user not connected on this instance
 	}
 
@@ -267,6 +268,8 @@ func (h *Hub) deliverToUser(userID int, msg OutgoingMessage) {
 
 	if err := conn.WriteMessage(websocket.TextMessage, data); err != nil {
 		log.Printf("[chat] write error to user %d: %v", userID, err)
+	} else {
+		log.Printf("[chat] delivered %s to user %d (msgId=%d)", msg.Type, userID, msg.MessageID)
 	}
 }
 

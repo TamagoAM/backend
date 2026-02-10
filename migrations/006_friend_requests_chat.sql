@@ -26,7 +26,7 @@ CREATE TABLE Friends (
 ) ENGINE=InnoDB;
 
 -- Chat messages stored in MySQL for persistence
--- Redis handles real-time delivery; MySQL is the source of truth
+-- Redis handles real-time delivery, MySQL is the source of truth
 CREATE TABLE ChatMessage (
     MessageId INT NOT NULL AUTO_INCREMENT,
     SenderID INT NOT NULL,
