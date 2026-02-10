@@ -1,6 +1,7 @@
 package graphql
 
 import (
+	"fmt"
 	"strings"
 	"time"
 
@@ -62,12 +63,6 @@ type CreateTamaInput struct {
 	DeathDay     *time.Time
 	CauseOfDeath *string
 	Traits       *string
-}
-
-type CreateFriendInput struct {
-	UserID            int
-	FriendID          int
-	DateBecameFriends time.Time
 }
 
 type CreateSponsorInput struct {
@@ -453,21 +448,39 @@ func NewSchema(db *sqlx.DB) (graphql.Schema, error) {
 	friendType := graphql.NewObject(graphql.ObjectConfig{
 		Name: "Friend",
 		Fields: graphql.Fields{
-			"userId": &graphql.Field{Type: graphql.Int, Resolve: func(p graphql.ResolveParams) (interface{}, error) {
+			"requestId": &graphql.Field{Type: graphql.Int, Resolve: func(p graphql.ResolveParams) (interface{}, error) {
 				if f, ok := sourceAs[models.Friend](p.Source); ok {
-					return f.UserID, nil
+					return f.RequestID, nil
 				}
 				return nil, nil
 			}},
-			"friendId": &graphql.Field{Type: graphql.Int, Resolve: func(p graphql.ResolveParams) (interface{}, error) {
+			"senderId": &graphql.Field{Type: graphql.Int, Resolve: func(p graphql.ResolveParams) (interface{}, error) {
 				if f, ok := sourceAs[models.Friend](p.Source); ok {
-					return f.FriendID, nil
+					return f.SenderID, nil
 				}
 				return nil, nil
 			}},
-			"dateBecameFriends": &graphql.Field{Type: graphql.String, Resolve: func(p graphql.ResolveParams) (interface{}, error) {
+			"receiverId": &graphql.Field{Type: graphql.Int, Resolve: func(p graphql.ResolveParams) (interface{}, error) {
 				if f, ok := sourceAs[models.Friend](p.Source); ok {
-					return formatDateValue(&f.DateBecameFriends), nil
+					return f.ReceiverID, nil
+				}
+				return nil, nil
+			}},
+			"status": &graphql.Field{Type: graphql.String, Resolve: func(p graphql.ResolveParams) (interface{}, error) {
+				if f, ok := sourceAs[models.Friend](p.Source); ok {
+					return f.Status, nil
+				}
+				return nil, nil
+			}},
+			"dateRequested": &graphql.Field{Type: graphql.String, Resolve: func(p graphql.ResolveParams) (interface{}, error) {
+				if f, ok := sourceAs[models.Friend](p.Source); ok {
+					return formatTimeValue(&f.DateRequested), nil
+				}
+				return nil, nil
+			}},
+			"dateResponded": &graphql.Field{Type: graphql.String, Resolve: func(p graphql.ResolveParams) (interface{}, error) {
+				if f, ok := sourceAs[models.Friend](p.Source); ok {
+					return formatTimeValue(f.DateResponded), nil
 				}
 				return nil, nil
 			}},
@@ -963,6 +976,53 @@ func NewSchema(db *sqlx.DB) (graphql.Schema, error) {
 					return store.FriendsByUser(p.Context, userID)
 				},
 			},
+			"pendingRequestsForUser": &graphql.Field{
+				Type: graphql.NewList(friendType),
+				Args: graphql.FieldConfigArgument{
+					"userId": &graphql.ArgumentConfig{Type: graphql.NewNonNull(graphql.Int)},
+				},
+				Resolve: func(p graphql.ResolveParams) (interface{}, error) {
+					userID := p.Args["userId"].(int)
+					return store.PendingRequestsForUser(p.Context, userID)
+				},
+			},
+			"sentRequestsByUser": &graphql.Field{
+				Type: graphql.NewList(friendType),
+				Args: graphql.FieldConfigArgument{
+					"userId": &graphql.ArgumentConfig{Type: graphql.NewNonNull(graphql.Int)},
+				},
+				Resolve: func(p graphql.ResolveParams) (interface{}, error) {
+					userID := p.Args["userId"].(int)
+					return store.SentRequestsByUser(p.Context, userID)
+				},
+			},
+			"acceptedFriendCount": &graphql.Field{
+				Type: graphql.Int,
+				Args: graphql.FieldConfigArgument{
+					"userId": &graphql.ArgumentConfig{Type: graphql.NewNonNull(graphql.Int)},
+				},
+				Resolve: func(p graphql.ResolveParams) (interface{}, error) {
+					userID := p.Args["userId"].(int)
+					return store.AcceptedFriendCount(p.Context, userID)
+				},
+			},
+			"searchUsers": &graphql.Field{
+				Type: graphql.NewList(userType),
+				Args: graphql.FieldConfigArgument{
+					"query": &graphql.ArgumentConfig{Type: graphql.NewNonNull(graphql.String)},
+					"limit": &graphql.ArgumentConfig{Type: graphql.Int, DefaultValue: 20},
+				},
+				Resolve: func(p graphql.ResolveParams) (interface{}, error) {
+					q := p.Args["query"].(string)
+					limit := 20
+					if v, ok := p.Args["limit"]; ok {
+						if i, ok := v.(int); ok {
+							limit = i
+						}
+					}
+					return store.SearchUsers(p.Context, q, limit)
+				},
+			},
 			"sponsorsByUser": &graphql.Field{
 				Type: graphql.NewList(sponsorType),
 				Args: graphql.FieldConfigArgument{
@@ -1058,15 +1118,6 @@ func NewSchema(db *sqlx.DB) (graphql.Schema, error) {
 			"deathDay":     &graphql.InputObjectFieldConfig{Type: graphql.String},
 			"causeOfDeath": &graphql.InputObjectFieldConfig{Type: graphql.String},
 			"traits":       &graphql.InputObjectFieldConfig{Type: graphql.String},
-		},
-	})
-
-	createFriendInput := graphql.NewInputObject(graphql.InputObjectConfig{
-		Name: "CreateFriendInput",
-		Fields: graphql.InputObjectConfigFieldMap{
-			"userId":            &graphql.InputObjectFieldConfig{Type: graphql.NewNonNull(graphql.Int)},
-			"friendId":          &graphql.InputObjectFieldConfig{Type: graphql.NewNonNull(graphql.Int)},
-			"dateBecameFriends": &graphql.InputObjectFieldConfig{Type: graphql.String},
 		},
 	})
 
@@ -1684,60 +1735,44 @@ func NewSchema(db *sqlx.DB) (graphql.Schema, error) {
 					return store.DeleteTama(p.Context, id)
 				},
 			},
-			"createFriend": &graphql.Field{
+			"sendFriendRequest": &graphql.Field{
 				Type: friendType,
 				Args: graphql.FieldConfigArgument{
-					"input": &graphql.ArgumentConfig{Type: graphql.NewNonNull(createFriendInput)},
+					"receiverId": &graphql.ArgumentConfig{Type: graphql.NewNonNull(graphql.Int)},
 				},
 				Resolve: func(p graphql.ResolveParams) (interface{}, error) {
-					inputMap := p.Args["input"].(map[string]interface{})
-					date := time.Now()
-					if v, ok := inputMap["dateBecameFriends"]; ok {
-						if s, ok := v.(string); ok {
-							if t, err := parseDateString(s); err == nil && t != nil {
-								date = *t
-							}
-						}
+					// Get sender from JWT context
+					claims, ok := p.Context.Value(auth.UserClaimsKey).(*auth.Claims)
+					if !ok || claims == nil {
+						return nil, fmt.Errorf("authentication required")
 					}
-					input := CreateFriendInput{
-						UserID:            inputMap["userId"].(int),
-						FriendID:          inputMap["friendId"].(int),
-						DateBecameFriends: date,
+					receiverID := p.Args["receiverId"].(int)
+					if claims.UserID == receiverID {
+						return nil, fmt.Errorf("cannot send friend request to yourself")
 					}
-					return store.CreateFriend(p.Context, input)
+					return store.SendFriendRequest(p.Context, claims.UserID, receiverID)
 				},
 			},
-			"updateFriend": &graphql.Field{
+			"respondFriendRequest": &graphql.Field{
 				Type: friendType,
 				Args: graphql.FieldConfigArgument{
-					"userId":            &graphql.ArgumentConfig{Type: graphql.NewNonNull(graphql.Int)},
-					"friendId":          &graphql.ArgumentConfig{Type: graphql.NewNonNull(graphql.Int)},
-					"dateBecameFriends": &graphql.ArgumentConfig{Type: graphql.String},
+					"requestId": &graphql.ArgumentConfig{Type: graphql.NewNonNull(graphql.Int)},
+					"accept":    &graphql.ArgumentConfig{Type: graphql.NewNonNull(graphql.Boolean)},
 				},
 				Resolve: func(p graphql.ResolveParams) (interface{}, error) {
-					userId := p.Args["userId"].(int)
-					friendId := p.Args["friendId"].(int)
-					date := time.Now()
-					if v, ok := p.Args["dateBecameFriends"]; ok {
-						if s, ok := v.(string); ok {
-							if t, err := parseDateString(s); err == nil && t != nil {
-								date = *t
-							}
-						}
-					}
-					return store.UpdateFriend(p.Context, userId, friendId, date)
+					requestID := p.Args["requestId"].(int)
+					accept := p.Args["accept"].(bool)
+					return store.RespondFriendRequest(p.Context, requestID, accept)
 				},
 			},
 			"deleteFriend": &graphql.Field{
 				Type: graphql.Boolean,
 				Args: graphql.FieldConfigArgument{
-					"userId":   &graphql.ArgumentConfig{Type: graphql.NewNonNull(graphql.Int)},
-					"friendId": &graphql.ArgumentConfig{Type: graphql.NewNonNull(graphql.Int)},
+					"requestId": &graphql.ArgumentConfig{Type: graphql.NewNonNull(graphql.Int)},
 				},
 				Resolve: func(p graphql.ResolveParams) (interface{}, error) {
-					userId := p.Args["userId"].(int)
-					friendId := p.Args["friendId"].(int)
-					return store.DeleteFriend(p.Context, userId, friendId)
+					requestID := p.Args["requestId"].(int)
+					return store.DeleteFriend(p.Context, requestID)
 				},
 			},
 			"createSponsor": &graphql.Field{

@@ -8,6 +8,7 @@ services:
       - .env
     depends_on:
       - mysql
+      - redis
   mysql:
     image: mysql:8.4
     environment:
@@ -18,3 +19,8 @@ services:
     ports:
       - "3306:3306"
     command: ["--default-authentication-plugin=mysql_native_password"]
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    command: ["redis-server", "--save", "60", "1", "--loglevel", "warning"]

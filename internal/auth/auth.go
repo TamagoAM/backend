@@ -8,6 +8,12 @@ import (
 	"golang.org/x/crypto/bcrypt"
 )
 
+// ContextKey is a typed key for context values to avoid collisions.
+type ContextKey string
+
+// UserClaimsKey is the context key used to store/retrieve JWT claims.
+const UserClaimsKey ContextKey = "userClaims"
+
 var (
 	ErrInvalidCredentials = errors.New("invalid credentials")
 	ErrInvalidToken       = errors.New("invalid or expired token")

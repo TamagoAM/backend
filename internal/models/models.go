@@ -61,9 +61,21 @@ type Tama struct {
 }
 
 type Friend struct {
-	UserID            int       `db:"UserID"`
-	FriendID          int       `db:"FriendID"`
-	DateBecameFriends time.Time `db:"DateBecameFriends"`
+	RequestID     int        `db:"RequestId"`
+	SenderID      int        `db:"SenderID"`
+	ReceiverID    int        `db:"ReceiverID"`
+	Status        string     `db:"Status"`
+	DateRequested time.Time  `db:"DateRequested"`
+	DateResponded *time.Time `db:"DateResponded"`
+}
+
+type ChatMessage struct {
+	MessageID  int        `db:"MessageId"`
+	SenderID   int        `db:"SenderID"`
+	ReceiverID int        `db:"ReceiverID"`
+	Body       string     `db:"Body"`
+	SentAt     time.Time  `db:"SentAt"`
+	ReadAt     *time.Time `db:"ReadAt"`
 }
 
 type Sponsor struct {

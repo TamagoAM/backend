@@ -15,6 +15,7 @@ type Config struct {
 	DBUser         string
 	DBPass         string
 	JWTSecret      string
+	RedisURL       string
 	MigrateOnStart bool
 }
 
@@ -67,6 +68,11 @@ func Load() Config {
 		}
 	}
 
+	redisURL := os.Getenv("REDIS_URL")
+	if redisURL == "" {
+		redisURL = "redis://127.0.0.1:6379/0"
+	}
+
 	return Config{
 		Port:           port,
 		DBHost:         dbHost,
@@ -75,6 +81,7 @@ func Load() Config {
 		DBUser:         dbUser,
 		DBPass:         dbPass,
 		JWTSecret:      jwtSecret,
+		RedisURL:       redisURL,
 		MigrateOnStart: migrate,
 	}
 }

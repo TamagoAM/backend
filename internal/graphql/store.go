@@ -33,10 +33,15 @@ type Store interface {
 	UpdateTama(ctx context.Context, id int, input CreateTamaInput) (*models.Tama, error)
 	DeleteTama(ctx context.Context, id int) (bool, error)
 	ListFriends(ctx context.Context) ([]models.Friend, error)
-	GetFriend(ctx context.Context, userID int, friendID int) (*models.Friend, error)
-	CreateFriend(ctx context.Context, input CreateFriendInput) (*models.Friend, error)
-	UpdateFriend(ctx context.Context, userID int, friendID int, dateBecameFriends time.Time) (*models.Friend, error)
-	DeleteFriend(ctx context.Context, userID int, friendID int) (bool, error)
+	GetFriendRequest(ctx context.Context, id int) (*models.Friend, error)
+	SendFriendRequest(ctx context.Context, senderID int, receiverID int) (*models.Friend, error)
+	RespondFriendRequest(ctx context.Context, requestID int, accept bool) (*models.Friend, error)
+	DeleteFriend(ctx context.Context, requestID int) (bool, error)
+	AcceptedFriendsByUser(ctx context.Context, userID int) ([]models.Friend, error)
+	PendingRequestsForUser(ctx context.Context, userID int) ([]models.Friend, error)
+	SentRequestsByUser(ctx context.Context, userID int) ([]models.Friend, error)
+	AcceptedFriendCount(ctx context.Context, userID int) (int, error)
+	SearchUsers(ctx context.Context, query string, limit int) ([]models.User, error)
 	ListSponsors(ctx context.Context) ([]models.Sponsor, error)
 	GetSponsor(ctx context.Context, sponsorID int, sponsoredID int) (*models.Sponsor, error)
 	CreateSponsor(ctx context.Context, input CreateSponsorInput) (*models.Sponsor, error)
@@ -81,7 +86,7 @@ type Store interface {
 
 	// User-scoped queries for user monitor
 	TamasByUser(ctx context.Context, userID int) ([]models.Tama, error)
-	FriendsByUser(ctx context.Context, userID int) ([]models.Friend, error)
+	FriendsByUser(ctx context.Context, userID int) ([]models.Friend, error) // alias for AcceptedFriendsByUser
 	SponsorsByUser(ctx context.Context, userID int) ([]models.Sponsor, error)
 	SponsoredByUser(ctx context.Context, userID int) ([]models.Sponsor, error)
 	TamaStatsByUser(ctx context.Context, userID int) ([]models.TamaStat, error)
@@ -299,42 +304,85 @@ func (s *SQLStore) DeleteTama(ctx context.Context, id int) (bool, error) {
 
 func (s *SQLStore) ListFriends(ctx context.Context) ([]models.Friend, error) {
 	var friends []models.Friend
-	err := s.db.SelectContext(ctx, &friends, "SELECT * FROM Friends ORDER BY DateBecameFriends DESC")
+	err := s.db.SelectContext(ctx, &friends, "SELECT * FROM Friends ORDER BY DateRequested DESC")
 	return friends, err
 }
 
-func (s *SQLStore) GetFriend(ctx context.Context, userID int, friendID int) (*models.Friend, error) {
+func (s *SQLStore) GetFriendRequest(ctx context.Context, id int) (*models.Friend, error) {
 	var friend models.Friend
-	err := s.db.GetContext(ctx, &friend, "SELECT * FROM Friends WHERE UserID = ? AND FriendID = ?", userID, friendID)
+	err := s.db.GetContext(ctx, &friend, "SELECT * FROM Friends WHERE RequestId = ?", id)
 	if err != nil {
 		return nil, err
 	}
 	return &friend, nil
 }
 
-func (s *SQLStore) CreateFriend(ctx context.Context, input CreateFriendInput) (*models.Friend, error) {
-	_, err := s.db.ExecContext(ctx, `INSERT INTO Friends (UserID, FriendID, DateBecameFriends) VALUES (?, ?, ?)`, input.UserID, input.FriendID, input.DateBecameFriends)
+func (s *SQLStore) SendFriendRequest(ctx context.Context, senderID int, receiverID int) (*models.Friend, error) {
+	res, err := s.db.ExecContext(ctx, `INSERT INTO Friends (SenderID, ReceiverID, Status) VALUES (?, ?, 'pending')`, senderID, receiverID)
 	if err != nil {
 		return nil, err
 	}
-	return s.GetFriend(ctx, input.UserID, input.FriendID)
-}
-
-func (s *SQLStore) UpdateFriend(ctx context.Context, userID int, friendID int, dateBecameFriends time.Time) (*models.Friend, error) {
-	_, err := s.db.ExecContext(ctx, `UPDATE Friends SET DateBecameFriends = ? WHERE UserID = ? AND FriendID = ?`, dateBecameFriends, userID, friendID)
+	id, err := res.LastInsertId()
 	if err != nil {
 		return nil, err
 	}
-	return s.GetFriend(ctx, userID, friendID)
+	return s.GetFriendRequest(ctx, int(id))
 }
 
-func (s *SQLStore) DeleteFriend(ctx context.Context, userID int, friendID int) (bool, error) {
-	res, err := s.db.ExecContext(ctx, `DELETE FROM Friends WHERE UserID = ? AND FriendID = ?`, userID, friendID)
+func (s *SQLStore) RespondFriendRequest(ctx context.Context, requestID int, accept bool) (*models.Friend, error) {
+	status := "declined"
+	if accept {
+		status = "accepted"
+	}
+	_, err := s.db.ExecContext(ctx, `UPDATE Friends SET Status = ?, DateResponded = NOW() WHERE RequestId = ? AND Status = 'pending'`, status, requestID)
+	if err != nil {
+		return nil, err
+	}
+	return s.GetFriendRequest(ctx, requestID)
+}
+
+func (s *SQLStore) DeleteFriend(ctx context.Context, requestID int) (bool, error) {
+	res, err := s.db.ExecContext(ctx, `DELETE FROM Friends WHERE RequestId = ?`, requestID)
 	if err != nil {
 		return false, err
 	}
 	rows, _ := res.RowsAffected()
 	return rows > 0, nil
+}
+
+func (s *SQLStore) AcceptedFriendsByUser(ctx context.Context, userID int) ([]models.Friend, error) {
+	var friends []models.Friend
+	err := s.db.SelectContext(ctx, &friends, "SELECT * FROM Friends WHERE Status = 'accepted' AND (SenderID = ? OR ReceiverID = ?) ORDER BY DateResponded DESC", userID, userID)
+	return friends, err
+}
+
+func (s *SQLStore) PendingRequestsForUser(ctx context.Context, userID int) ([]models.Friend, error) {
+	var friends []models.Friend
+	err := s.db.SelectContext(ctx, &friends, "SELECT * FROM Friends WHERE Status = 'pending' AND ReceiverID = ? ORDER BY DateRequested DESC", userID)
+	return friends, err
+}
+
+func (s *SQLStore) SentRequestsByUser(ctx context.Context, userID int) ([]models.Friend, error) {
+	var friends []models.Friend
+	err := s.db.SelectContext(ctx, &friends, "SELECT * FROM Friends WHERE Status = 'pending' AND SenderID = ? ORDER BY DateRequested DESC", userID)
+	return friends, err
+}
+
+func (s *SQLStore) AcceptedFriendCount(ctx context.Context, userID int) (int, error) {
+	var count int
+	err := s.db.GetContext(ctx, &count, "SELECT COUNT(*) FROM Friends WHERE Status = 'accepted' AND (SenderID = ? OR ReceiverID = ?)", userID, userID)
+	return count, err
+}
+
+func (s *SQLStore) SearchUsers(ctx context.Context, query string, limit int) ([]models.User, error) {
+	var users []models.User
+	pattern := "%" + query + "%"
+	err := s.db.SelectContext(ctx, &users, "SELECT * FROM Users WHERE UserName LIKE ? OR Name LIKE ? OR LastName LIKE ? ORDER BY UserName LIMIT ?", pattern, pattern, pattern, limit)
+	return users, err
+}
+
+func (s *SQLStore) FriendsByUser(ctx context.Context, userID int) ([]models.Friend, error) {
+	return s.AcceptedFriendsByUser(ctx, userID)
 }
 
 func (s *SQLStore) ListSponsors(ctx context.Context) ([]models.Sponsor, error) {
@@ -649,10 +697,9 @@ func (s *SQLStore) TamasByUser(ctx context.Context, userID int) ([]models.Tama, 
 	return tamas, err
 }
 
-func (s *SQLStore) FriendsByUser(ctx context.Context, userID int) ([]models.Friend, error) {
-	var friends []models.Friend
-	err := s.db.SelectContext(ctx, &friends, "SELECT * FROM Friends WHERE UserID = ? OR FriendID = ? ORDER BY DateBecameFriends DESC", userID, userID)
-	return friends, err
+func (s *SQLStore) FriendsOldByUser(ctx context.Context, userID int) ([]models.Friend, error) {
+	// Deprecated: kept for compilation; use AcceptedFriendsByUser
+	return s.AcceptedFriendsByUser(ctx, userID)
 }
 
 func (s *SQLStore) SponsorsByUser(ctx context.Context, userID int) ([]models.Sponsor, error) {

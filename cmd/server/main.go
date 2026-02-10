@@ -3,23 +3,21 @@ package main
 import (
 	"context"
 	"log"
+	"strconv"
 	"strings"
 
 	"github.com/gofiber/adaptor/v2"
 	"github.com/gofiber/fiber/v2"
 	"github.com/gofiber/fiber/v2/middleware/cors"
+	"github.com/gofiber/websocket/v2"
 	"github.com/graphql-go/handler"
 
 	"tamagoam/internal/auth"
+	"tamagoam/internal/chat"
 	"tamagoam/internal/config"
 	"tamagoam/internal/db"
 	gql "tamagoam/internal/graphql"
 )
-
-// contextKey is unexported to avoid collisions.
-type contextKey string
-
-const userClaimsKey contextKey = "userClaims"
 
 func main() {
 	log.Println("starting server...")
@@ -48,11 +46,18 @@ func main() {
 		if err := db.Migrate(dbConn, "migrations/005_seed_game_data.sql"); err != nil {
 			log.Fatalf("db migrate 005 failed: %v", err)
 		}
-		if err := db.Migrate(dbConn, "migrations/006_datetime_columns.sql"); err != nil {
+		if err := db.Migrate(dbConn, "migrations/006_friend_requests_chat.sql"); err != nil {
 			log.Fatalf("db migrate 006 failed: %v", err)
 		}
 	}
 	log.Println("db migrated")
+
+	// ─── Chat Hub (WebSocket + Redis) ─────────────────────────
+	chatHub, err := chat.NewHub(dbConn, cfg.RedisURL)
+	if err != nil {
+		log.Fatalf("chat hub init failed: %v", err)
+	}
+	log.Println("chat hub initialised")
 
 	schema, err := gql.NewSchema(dbConn)
 	if err != nil {
@@ -218,7 +223,7 @@ func main() {
 		if header != "" {
 			tokenStr := strings.TrimPrefix(header, "Bearer ")
 			if claims, err := auth.ValidateToken(cfg.JWTSecret, tokenStr); err == nil {
-				ctx := context.WithValue(c.Context(), userClaimsKey, claims)
+				ctx := context.WithValue(c.Context(), auth.UserClaimsKey, claims)
 				c.SetUserContext(ctx)
 			}
 		}
@@ -238,6 +243,76 @@ func main() {
 
 	app.Post("/graphql", jwtMiddleware, adaptor.HTTPHandler(gqlHandler))
 	app.Get("/playground", adaptor.HTTPHandler(playgroundHandler))
+
+	// ─── WebSocket for real-time chat ─────────────────────────
+	app.Use("/ws", func(c *fiber.Ctx) error {
+		if websocket.IsWebSocketUpgrade(c) {
+			return c.Next()
+		}
+		return fiber.ErrUpgradeRequired
+	})
+
+	app.Get("/ws", websocket.New(func(c *websocket.Conn) {
+		// Authenticate via query param ?token=<jwt>
+		tokenStr := c.Query("token")
+		if tokenStr == "" {
+			c.WriteMessage(websocket.CloseMessage,
+				websocket.FormatCloseMessage(websocket.CloseNormalClosure, "no token"))
+			c.Close()
+			return
+		}
+		claims, err := auth.ValidateToken(cfg.JWTSecret, tokenStr)
+		if err != nil {
+			c.WriteMessage(websocket.CloseMessage,
+				websocket.FormatCloseMessage(websocket.CloseNormalClosure, "invalid token"))
+			c.Close()
+			return
+		}
+
+		userID := claims.UserID
+		chatHub.Register(userID, c)
+		defer chatHub.Unregister(userID)
+
+		for {
+			_, msg, err := c.ReadMessage()
+			if err != nil {
+				break
+			}
+			chatHub.HandleMessage(userID, msg)
+		}
+	}))
+
+	// ─── Chat REST endpoints ──────────────────────────────────
+	app.Get("/chat/history", jwtMiddleware, func(c *fiber.Ctx) error {
+		claims, ok := c.UserContext().Value(auth.UserClaimsKey).(*auth.Claims)
+		if !ok || claims == nil {
+			return c.Status(401).JSON(fiber.Map{"error": "authentication required"})
+		}
+		withID, err := strconv.Atoi(c.Query("with"))
+		if err != nil {
+			return c.Status(400).JSON(fiber.Map{"error": "'with' query param (user id) is required"})
+		}
+		limit, _ := strconv.Atoi(c.Query("limit", "50"))
+		offset, _ := strconv.Atoi(c.Query("offset", "0"))
+		msgs, err := chatHub.GetConversation(claims.UserID, withID, limit, offset)
+		if err != nil {
+			return c.Status(500).JSON(fiber.Map{"error": err.Error()})
+		}
+		return c.JSON(msgs)
+	})
+
+	app.Get("/chat/unread", jwtMiddleware, func(c *fiber.Ctx) error {
+		claims, ok := c.UserContext().Value(auth.UserClaimsKey).(*auth.Claims)
+		if !ok || claims == nil {
+			return c.Status(401).JSON(fiber.Map{"error": "authentication required"})
+		}
+		senderID, _ := strconv.Atoi(c.Query("from", "0"))
+		count, err := chatHub.GetUnreadCount(claims.UserID, senderID)
+		if err != nil {
+			return c.Status(500).JSON(fiber.Map{"error": err.Error()})
+		}
+		return c.JSON(fiber.Map{"unread": count})
+	})
 
 	log.Printf("listening on :%s", cfg.Port)
 	if err := app.Listen(":" + cfg.Port); err != nil {
