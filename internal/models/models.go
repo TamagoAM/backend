@@ -44,6 +44,7 @@ type TamaStat struct {
 	SocialSatis   float64    `db:"SocialSatis"`
 	WorkSatis     float64    `db:"WorkSatis"`
 	PersonalSatis float64    `db:"PersonalSatis"`
+	Happiness     float64    `db:"Happiness"`
 }
 
 type Tama struct {

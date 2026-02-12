@@ -74,6 +74,7 @@ CREATE TABLE Tama_stats (
     SocialSatis DOUBLE DEFAULT 0,
     WorkSatis DOUBLE DEFAULT 0,
     PersonalSatis DOUBLE DEFAULT 0,
+    Happiness DOUBLE DEFAULT 100,
     PRIMARY KEY (TamaStatId)
 ) ENGINE=InnoDB;
 

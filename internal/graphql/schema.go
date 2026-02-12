@@ -50,6 +50,7 @@ type CreateTamaStatInput struct {
 	SocialSatis   float64
 	WorkSatis     float64
 	PersonalSatis float64
+	Happiness     float64
 }
 
 type CreateTamaInput struct {
@@ -402,6 +403,12 @@ func NewSchema(db *sqlx.DB) (graphql.Schema, error) {
 			"personalSatis": &graphql.Field{Type: graphql.Float, Resolve: func(p graphql.ResolveParams) (interface{}, error) {
 				if s, ok := sourceAs[models.TamaStat](p.Source); ok {
 					return s.PersonalSatis, nil
+				}
+				return nil, nil
+			}},
+			"happiness": &graphql.Field{Type: graphql.Float, Resolve: func(p graphql.ResolveParams) (interface{}, error) {
+				if s, ok := sourceAs[models.TamaStat](p.Source); ok {
+					return s.Happiness, nil
 				}
 				return nil, nil
 			}},
@@ -1386,6 +1393,7 @@ func NewSchema(db *sqlx.DB) (graphql.Schema, error) {
 			"socialSatis":   &graphql.InputObjectFieldConfig{Type: graphql.Float},
 			"workSatis":     &graphql.InputObjectFieldConfig{Type: graphql.Float},
 			"personalSatis": &graphql.InputObjectFieldConfig{Type: graphql.Float},
+			"happiness":     &graphql.InputObjectFieldConfig{Type: graphql.Float},
 		},
 	})
 
@@ -1832,6 +1840,11 @@ func NewSchema(db *sqlx.DB) (graphql.Schema, error) {
 							input.PersonalSatis = f
 						}
 					}
+					if v, ok := inputMap["happiness"]; ok {
+						if f, ok := v.(float64); ok {
+							input.Happiness = f
+						}
+					}
 					return store.CreateTamaStat(p.Context, input)
 				},
 			},
@@ -1936,6 +1949,11 @@ func NewSchema(db *sqlx.DB) (graphql.Schema, error) {
 					if v, ok := inputMap["personalSatis"]; ok {
 						if f, ok := v.(float64); ok {
 							input.PersonalSatis = f
+						}
+					}
+					if v, ok := inputMap["happiness"]; ok {
+						if f, ok := v.(float64); ok {
+							input.Happiness = f
 						}
 					}
 					return store.UpdateTamaStat(p.Context, id, input)
