@@ -663,6 +663,47 @@ func main() {
 		return c.JSON(fiber.Map{"success": true})
 	})
 
+	// ─── Widget data endpoint (lightweight REST) ──────────────
+	// Returns pre-computed tama status for home-screen widgets.
+	app.Get("/api/widget-data", jwtMiddleware, func(c *fiber.Ctx) error {
+		claims, ok := c.UserContext().Value(auth.UserClaimsKey).(*auth.Claims)
+		if !ok || claims == nil {
+			return c.Status(401).JSON(fiber.Map{"error": "authentication required"})
+		}
+
+		tamas, err := store.TamasByUser(c.Context(), claims.UserID)
+		if err != nil || len(tamas) == 0 {
+			return c.Status(404).JSON(fiber.Map{"error": "no tama found"})
+		}
+		tama := tamas[0]
+
+		stats, err := store.TamaStatsByUser(c.Context(), claims.UserID)
+		if err != nil || len(stats) == 0 {
+			return c.Status(404).JSON(fiber.Map{"error": "no stats found"})
+		}
+		stat := stats[0]
+
+		// Happiness = average of the three satisfactions (mirrors frontend formula)
+		happiness := (stat.SocialSatis + stat.WorkSatis + stat.PersonalSatis) / 3.0
+
+		isAlive := tama.DeathDay == nil
+		isSick := tama.Sickness != nil && *tama.Sickness != ""
+
+		return c.JSON(fiber.Map{
+			"tamaName":      tama.Name,
+			"happiness":     happiness,
+			"hunger":        stat.Hunger,
+			"boredom":       stat.Boredom,
+			"hygiene":       stat.Hygiene,
+			"socialSatis":   stat.SocialSatis,
+			"workSatis":     stat.WorkSatis,
+			"personalSatis": stat.PersonalSatis,
+			"money":         stat.Money,
+			"isAlive":       isAlive,
+			"isSick":        isSick,
+		})
+	})
+
 	log.Printf("listening on :%s", cfg.Port)
 	if err := app.Listen(":" + cfg.Port); err != nil {
 		log.Fatalf("server failed: %v", err)
