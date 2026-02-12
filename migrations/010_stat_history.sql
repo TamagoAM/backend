@@ -25,11 +25,11 @@ CREATE TABLE IF NOT EXISTS StatHistory (
     CarAccident  INT NOT NULL DEFAULT 0,
     WorkAccident INT NOT NULL DEFAULT 0,
     -- Trigger context
-    Trigger     VARCHAR(50) NOT NULL DEFAULT 'periodic',
+    `Trigger`   VARCHAR(50) NOT NULL DEFAULT 'periodic',
     -- Timestamp
     RecordedAt  DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     PRIMARY KEY (HistoryId),
     FOREIGN KEY (TamaId) REFERENCES Tama(TamaId) ON DELETE CASCADE,
     INDEX idx_tama_time (TamaId, RecordedAt),
-    INDEX idx_trigger (Trigger)
+    INDEX idx_trigger (`Trigger`)
 ) ENGINE=InnoDB;
