@@ -19,6 +19,8 @@ DROP TABLE IF EXISTS Tama;
 DROP TABLE IF EXISTS Tama_stats;
 DROP TABLE IF EXISTS Race;
 DROP TABLE IF EXISTS Users;
+DROP TABLE IF EXISTS LifeChoiceOption;
+DROP TABLE IF EXISTS TamaLifeChoiceHistory;
 SET FOREIGN_KEY_CHECKS = 1;
 
 -- ═══════════════════════════════════════════════════
