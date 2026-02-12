@@ -93,6 +93,10 @@ type Store interface {
 
 	// Update last connection timestamp on login
 	UpdateLastConnection(ctx context.Context, userID int) error
+
+	// Stat history
+	CreateStatHistory(ctx context.Context, input CreateStatHistoryInput) (*models.StatHistory, error)
+	StatHistoryByTama(ctx context.Context, tamaID int, since *time.Time) ([]models.StatHistory, error)
 }
 
 type SQLStore struct {
@@ -844,5 +848,38 @@ func (s *SQLStore) CreateHistory(ctx context.Context, input CreateLifeChoiceHist
 func (s *SQLStore) ListHistoryByTama(ctx context.Context, tamaID int) ([]models.TamaLifeChoiceHistory, error) {
 	var hist []models.TamaLifeChoiceHistory
 	err := s.db.SelectContext(ctx, &hist, "SELECT * FROM TamaLifeChoiceHistory WHERE TamaId = ? ORDER BY CreatedAt DESC", tamaID)
+	return hist, err
+}
+
+// ─── StatHistory CRUD ──────────────────────────────
+
+func (s *SQLStore) CreateStatHistory(ctx context.Context, input CreateStatHistoryInput) (*models.StatHistory, error) {
+	res, err := s.db.ExecContext(ctx, `INSERT INTO StatHistory (TamaId, Hunger, Boredom, Hygiene, Money, SocialSatis, WorkSatis, PersonalSatis, Happiness, Fed, Played, Cleaned, Worked, CarAccident, WorkAccident, `+"`Trigger`"+`) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+		input.TamaID, input.Hunger, input.Boredom, input.Hygiene, input.Money,
+		input.SocialSatis, input.WorkSatis, input.PersonalSatis, input.Happiness,
+		input.Fed, input.Played, input.Cleaned, input.Worked,
+		input.CarAccident, input.WorkAccident, input.Trigger)
+	if err != nil {
+		return nil, err
+	}
+	id, err := res.LastInsertId()
+	if err != nil {
+		return nil, err
+	}
+	var h models.StatHistory
+	err = s.db.GetContext(ctx, &h, "SELECT * FROM StatHistory WHERE HistoryId = ?", id)
+	if err != nil {
+		return nil, err
+	}
+	return &h, nil
+}
+
+func (s *SQLStore) StatHistoryByTama(ctx context.Context, tamaID int, since *time.Time) ([]models.StatHistory, error) {
+	var hist []models.StatHistory
+	if since != nil {
+		err := s.db.SelectContext(ctx, &hist, "SELECT * FROM StatHistory WHERE TamaId = ? AND RecordedAt >= ? ORDER BY RecordedAt ASC", tamaID, since)
+		return hist, err
+	}
+	err := s.db.SelectContext(ctx, &hist, "SELECT * FROM StatHistory WHERE TamaId = ? ORDER BY RecordedAt ASC", tamaID)
 	return hist, err
 }

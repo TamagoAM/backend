@@ -182,3 +182,24 @@ type TamaLifeChoiceHistory struct {
 	Action         string    `db:"Action"`
 	CreatedAt      time.Time `db:"CreatedAt"`
 }
+
+type StatHistory struct {
+	HistoryID     int       `db:"HistoryId"`
+	TamaID        int       `db:"TamaId"`
+	Hunger        int       `db:"Hunger"`
+	Boredom       int       `db:"Boredom"`
+	Hygiene       int       `db:"Hygiene"`
+	Money         int       `db:"Money"`
+	SocialSatis   float64   `db:"SocialSatis"`
+	WorkSatis     float64   `db:"WorkSatis"`
+	PersonalSatis float64   `db:"PersonalSatis"`
+	Happiness     float64   `db:"Happiness"`
+	Fed           int       `db:"Fed"`
+	Played        int       `db:"Played"`
+	Cleaned       int       `db:"Cleaned"`
+	Worked        int       `db:"Worked"`
+	CarAccident   int       `db:"CarAccident"`
+	WorkAccident  int       `db:"WorkAccident"`
+	Trigger       string    `db:"Trigger"`
+	RecordedAt    time.Time `db:"RecordedAt"`
+}

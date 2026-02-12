@@ -149,6 +149,25 @@ type CreateActiveEventInput struct {
 	IsGlobal     bool
 }
 
+type CreateStatHistoryInput struct {
+	TamaID        int
+	Hunger        int
+	Boredom       int
+	Hygiene       int
+	Money         int
+	SocialSatis   float64
+	WorkSatis     float64
+	PersonalSatis float64
+	Happiness     float64
+	Fed           int
+	Played        int
+	Cleaned       int
+	Worked        int
+	CarAccident   int
+	WorkAccident  int
+	Trigger       string
+}
+
 // sourceAs extracts the concrete value from p.Source whether it was passed
 // as a value (T) or a pointer (*T).  This is needed because graphql-go
 // passes list-element sources as values but single-record resolver returns
@@ -953,6 +972,120 @@ func NewSchema(db *sqlx.DB) (graphql.Schema, error) {
 		},
 	})
 
+	statHistoryType := graphql.NewObject(graphql.ObjectConfig{
+		Name: "StatHistory",
+		Fields: graphql.Fields{
+			"id": &graphql.Field{Type: graphql.Int, Resolve: func(p graphql.ResolveParams) (interface{}, error) {
+				if h, ok := sourceAs[models.StatHistory](p.Source); ok {
+					return h.HistoryID, nil
+				}
+				return nil, nil
+			}},
+			"tamaId": &graphql.Field{Type: graphql.Int, Resolve: func(p graphql.ResolveParams) (interface{}, error) {
+				if h, ok := sourceAs[models.StatHistory](p.Source); ok {
+					return h.TamaID, nil
+				}
+				return nil, nil
+			}},
+			"hunger": &graphql.Field{Type: graphql.Int, Resolve: func(p graphql.ResolveParams) (interface{}, error) {
+				if h, ok := sourceAs[models.StatHistory](p.Source); ok {
+					return h.Hunger, nil
+				}
+				return nil, nil
+			}},
+			"boredom": &graphql.Field{Type: graphql.Int, Resolve: func(p graphql.ResolveParams) (interface{}, error) {
+				if h, ok := sourceAs[models.StatHistory](p.Source); ok {
+					return h.Boredom, nil
+				}
+				return nil, nil
+			}},
+			"hygiene": &graphql.Field{Type: graphql.Int, Resolve: func(p graphql.ResolveParams) (interface{}, error) {
+				if h, ok := sourceAs[models.StatHistory](p.Source); ok {
+					return h.Hygiene, nil
+				}
+				return nil, nil
+			}},
+			"money": &graphql.Field{Type: graphql.Int, Resolve: func(p graphql.ResolveParams) (interface{}, error) {
+				if h, ok := sourceAs[models.StatHistory](p.Source); ok {
+					return h.Money, nil
+				}
+				return nil, nil
+			}},
+			"socialSatis": &graphql.Field{Type: graphql.Float, Resolve: func(p graphql.ResolveParams) (interface{}, error) {
+				if h, ok := sourceAs[models.StatHistory](p.Source); ok {
+					return h.SocialSatis, nil
+				}
+				return nil, nil
+			}},
+			"workSatis": &graphql.Field{Type: graphql.Float, Resolve: func(p graphql.ResolveParams) (interface{}, error) {
+				if h, ok := sourceAs[models.StatHistory](p.Source); ok {
+					return h.WorkSatis, nil
+				}
+				return nil, nil
+			}},
+			"personalSatis": &graphql.Field{Type: graphql.Float, Resolve: func(p graphql.ResolveParams) (interface{}, error) {
+				if h, ok := sourceAs[models.StatHistory](p.Source); ok {
+					return h.PersonalSatis, nil
+				}
+				return nil, nil
+			}},
+			"happiness": &graphql.Field{Type: graphql.Float, Resolve: func(p graphql.ResolveParams) (interface{}, error) {
+				if h, ok := sourceAs[models.StatHistory](p.Source); ok {
+					return h.Happiness, nil
+				}
+				return nil, nil
+			}},
+			"fed": &graphql.Field{Type: graphql.Int, Resolve: func(p graphql.ResolveParams) (interface{}, error) {
+				if h, ok := sourceAs[models.StatHistory](p.Source); ok {
+					return h.Fed, nil
+				}
+				return nil, nil
+			}},
+			"played": &graphql.Field{Type: graphql.Int, Resolve: func(p graphql.ResolveParams) (interface{}, error) {
+				if h, ok := sourceAs[models.StatHistory](p.Source); ok {
+					return h.Played, nil
+				}
+				return nil, nil
+			}},
+			"cleaned": &graphql.Field{Type: graphql.Int, Resolve: func(p graphql.ResolveParams) (interface{}, error) {
+				if h, ok := sourceAs[models.StatHistory](p.Source); ok {
+					return h.Cleaned, nil
+				}
+				return nil, nil
+			}},
+			"worked": &graphql.Field{Type: graphql.Int, Resolve: func(p graphql.ResolveParams) (interface{}, error) {
+				if h, ok := sourceAs[models.StatHistory](p.Source); ok {
+					return h.Worked, nil
+				}
+				return nil, nil
+			}},
+			"carAccident": &graphql.Field{Type: graphql.Int, Resolve: func(p graphql.ResolveParams) (interface{}, error) {
+				if h, ok := sourceAs[models.StatHistory](p.Source); ok {
+					return h.CarAccident, nil
+				}
+				return nil, nil
+			}},
+			"workAccident": &graphql.Field{Type: graphql.Int, Resolve: func(p graphql.ResolveParams) (interface{}, error) {
+				if h, ok := sourceAs[models.StatHistory](p.Source); ok {
+					return h.WorkAccident, nil
+				}
+				return nil, nil
+			}},
+			"trigger": &graphql.Field{Type: graphql.String, Resolve: func(p graphql.ResolveParams) (interface{}, error) {
+				if h, ok := sourceAs[models.StatHistory](p.Source); ok {
+					return h.Trigger, nil
+				}
+				return nil, nil
+			}},
+			"recordedAt": &graphql.Field{Type: graphql.String, Resolve: func(p graphql.ResolveParams) (interface{}, error) {
+				if h, ok := sourceAs[models.StatHistory](p.Source); ok {
+					return formatTimeValue(&h.RecordedAt), nil
+				}
+				return nil, nil
+			}},
+		},
+	})
+
 	queryType := graphql.NewObject(graphql.ObjectConfig{
 		Name: "Query",
 		Fields: graphql.Fields{
@@ -1185,6 +1318,25 @@ func NewSchema(db *sqlx.DB) (graphql.Schema, error) {
 					return store.TamaStatsByUser(p.Context, userID)
 				},
 			},
+			"statHistoryByTama": &graphql.Field{
+				Type: graphql.NewList(statHistoryType),
+				Args: graphql.FieldConfigArgument{
+					"tamaId": &graphql.ArgumentConfig{Type: graphql.NewNonNull(graphql.Int)},
+					"since":  &graphql.ArgumentConfig{Type: graphql.String},
+				},
+				Resolve: func(p graphql.ResolveParams) (interface{}, error) {
+					tamaID := p.Args["tamaId"].(int)
+					var since *time.Time
+					if v, ok := p.Args["since"]; ok {
+						if s, ok := v.(string); ok && s != "" {
+							if t, err := time.Parse(time.RFC3339, s); err == nil {
+								since = &t
+							}
+						}
+					}
+					return store.StatHistoryByTama(p.Context, tamaID, since)
+				},
+			},
 		},
 	})
 
@@ -1364,6 +1516,28 @@ func NewSchema(db *sqlx.DB) (graphql.Schema, error) {
 			"endDate":      &graphql.InputObjectFieldConfig{Type: graphql.String},
 			"triggeredBy":  &graphql.InputObjectFieldConfig{Type: graphql.Int},
 			"isGlobal":     &graphql.InputObjectFieldConfig{Type: graphql.Boolean},
+		},
+	})
+
+	createStatHistoryInput := graphql.NewInputObject(graphql.InputObjectConfig{
+		Name: "CreateStatHistoryInput",
+		Fields: graphql.InputObjectConfigFieldMap{
+			"tamaId":        &graphql.InputObjectFieldConfig{Type: graphql.NewNonNull(graphql.Int)},
+			"hunger":        &graphql.InputObjectFieldConfig{Type: graphql.Int},
+			"boredom":       &graphql.InputObjectFieldConfig{Type: graphql.Int},
+			"hygiene":       &graphql.InputObjectFieldConfig{Type: graphql.Int},
+			"money":         &graphql.InputObjectFieldConfig{Type: graphql.Int},
+			"socialSatis":   &graphql.InputObjectFieldConfig{Type: graphql.Float},
+			"workSatis":     &graphql.InputObjectFieldConfig{Type: graphql.Float},
+			"personalSatis": &graphql.InputObjectFieldConfig{Type: graphql.Float},
+			"happiness":     &graphql.InputObjectFieldConfig{Type: graphql.Float},
+			"fed":           &graphql.InputObjectFieldConfig{Type: graphql.Int},
+			"played":        &graphql.InputObjectFieldConfig{Type: graphql.Int},
+			"cleaned":       &graphql.InputObjectFieldConfig{Type: graphql.Int},
+			"worked":        &graphql.InputObjectFieldConfig{Type: graphql.Int},
+			"carAccident":   &graphql.InputObjectFieldConfig{Type: graphql.Int},
+			"workAccident":  &graphql.InputObjectFieldConfig{Type: graphql.Int},
+			"trigger":       &graphql.InputObjectFieldConfig{Type: graphql.String},
 		},
 	})
 
@@ -2680,6 +2854,96 @@ func NewSchema(db *sqlx.DB) (graphql.Schema, error) {
 				Resolve: func(p graphql.ResolveParams) (interface{}, error) {
 					id := p.Args["id"].(int)
 					return store.DeleteActiveEvent(p.Context, id)
+				},
+			},
+			// ─── StatHistory mutations ──────────────────────
+			"createStatHistory": &graphql.Field{
+				Type: statHistoryType,
+				Args: graphql.FieldConfigArgument{
+					"input": &graphql.ArgumentConfig{Type: graphql.NewNonNull(createStatHistoryInput)},
+				},
+				Resolve: func(p graphql.ResolveParams) (interface{}, error) {
+					inputMap := p.Args["input"].(map[string]interface{})
+					input := CreateStatHistoryInput{
+						TamaID:  inputMap["tamaId"].(int),
+						Trigger: "periodic",
+					}
+					if v, ok := inputMap["hunger"]; ok {
+						if i, ok := v.(int); ok {
+							input.Hunger = i
+						}
+					}
+					if v, ok := inputMap["boredom"]; ok {
+						if i, ok := v.(int); ok {
+							input.Boredom = i
+						}
+					}
+					if v, ok := inputMap["hygiene"]; ok {
+						if i, ok := v.(int); ok {
+							input.Hygiene = i
+						}
+					}
+					if v, ok := inputMap["money"]; ok {
+						if i, ok := v.(int); ok {
+							input.Money = i
+						}
+					}
+					if v, ok := inputMap["socialSatis"]; ok {
+						if f, ok := v.(float64); ok {
+							input.SocialSatis = f
+						}
+					}
+					if v, ok := inputMap["workSatis"]; ok {
+						if f, ok := v.(float64); ok {
+							input.WorkSatis = f
+						}
+					}
+					if v, ok := inputMap["personalSatis"]; ok {
+						if f, ok := v.(float64); ok {
+							input.PersonalSatis = f
+						}
+					}
+					if v, ok := inputMap["happiness"]; ok {
+						if f, ok := v.(float64); ok {
+							input.Happiness = f
+						}
+					}
+					if v, ok := inputMap["fed"]; ok {
+						if i, ok := v.(int); ok {
+							input.Fed = i
+						}
+					}
+					if v, ok := inputMap["played"]; ok {
+						if i, ok := v.(int); ok {
+							input.Played = i
+						}
+					}
+					if v, ok := inputMap["cleaned"]; ok {
+						if i, ok := v.(int); ok {
+							input.Cleaned = i
+						}
+					}
+					if v, ok := inputMap["worked"]; ok {
+						if i, ok := v.(int); ok {
+							input.Worked = i
+						}
+					}
+					if v, ok := inputMap["carAccident"]; ok {
+						if i, ok := v.(int); ok {
+							input.CarAccident = i
+						}
+					}
+					if v, ok := inputMap["workAccident"]; ok {
+						if i, ok := v.(int); ok {
+							input.WorkAccident = i
+						}
+					}
+					if v, ok := inputMap["trigger"]; ok {
+						if s, ok := v.(string); ok && s != "" {
+							input.Trigger = s
+						}
+					}
+					return store.CreateStatHistory(p.Context, input)
 				},
 			},
 		},
