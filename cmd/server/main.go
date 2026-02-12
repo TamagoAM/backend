@@ -58,8 +58,11 @@ func main() {
 		if err := db.Migrate(dbConn, "migrations/008_life_choice_options.sql"); err != nil {
 			log.Fatalf("db migrate 008 failed: %v", err)
 		}
-		if err := db.Migrate(dbConn, "migrations/009_stat_history.sql"); err != nil {
+		if err := db.Migrate(dbConn, "migrations/009_add_happiness_to_tama_stats.sql"); err != nil {
 			log.Fatalf("db migrate 009 failed: %v", err)
+		}
+		if err := db.Migrate(dbConn, "migrations/010_stat_history.sql"); err != nil {
+			log.Fatalf("db migrate 010 failed: %v", err)
 		}
 	}
 	log.Println("db migrated")

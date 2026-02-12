@@ -1,5 +1,5 @@
 -- ═══════════════════════════════════════════════════
--- 002_stat_history.sql — Periodic stat snapshots for graph display
+-- 010_stat_history.sql — Periodic stat snapshots for graph display
 -- ═══════════════════════════════════════════════════
 
 CREATE TABLE IF NOT EXISTS StatHistory (
@@ -25,7 +25,7 @@ CREATE TABLE IF NOT EXISTS StatHistory (
     CarAccident  INT NOT NULL DEFAULT 0,
     WorkAccident INT NOT NULL DEFAULT 0,
     -- Trigger context
-    Trigger     VARCHAR(50) NOT NULL DEFAULT 'periodic',  -- 'periodic', 'feed', 'play', 'clean', 'work', 'heal'
+    Trigger     VARCHAR(50) NOT NULL DEFAULT 'periodic',
     -- Timestamp
     RecordedAt  DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     PRIMARY KEY (HistoryId),
