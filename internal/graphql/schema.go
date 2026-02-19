@@ -10,6 +10,7 @@ import (
 
 	"tamagoam/internal/auth"
 	"tamagoam/internal/models"
+	"tamagoam/internal/notifications"
 )
 
 type CreateUserInput struct {
@@ -184,7 +185,7 @@ func sourceAs[T any](src interface{}) (T, bool) {
 	return zero, false
 }
 
-func NewSchema(db *sqlx.DB) (graphql.Schema, error) {
+func NewSchema(db *sqlx.DB, notifs *notifications.Service) (graphql.Schema, error) {
 	store := NewSQLStore(db)
 
 	userType := graphql.NewObject(graphql.ObjectConfig{
@@ -3066,6 +3067,93 @@ func NewSchema(db *sqlx.DB) (graphql.Schema, error) {
 					userID := p.Args["userId"].(int)
 					token := p.Args["token"].(string)
 					return true, store.UnregisterPushToken(p.Context, userID, token)
+				},
+			},
+
+			// ─── Admin: send push notification ─────────────────────
+			"sendPushNotification": &graphql.Field{
+				Type:        graphql.Int,
+				Description: "Send a push notification to a specific user or all users. Returns the number of users notified.",
+				Args: graphql.FieldConfigArgument{
+					"userId":    &graphql.ArgumentConfig{Type: graphql.Int, Description: "Target user ID. Omit or pass 0 to send to all users."},
+					"title":     &graphql.ArgumentConfig{Type: graphql.NewNonNull(graphql.String)},
+					"body":      &graphql.ArgumentConfig{Type: graphql.NewNonNull(graphql.String)},
+					"notifType": &graphql.ArgumentConfig{Type: graphql.String, Description: "Notification type: info, warning, urgent. Defaults to info."},
+				},
+				Resolve: func(p graphql.ResolveParams) (interface{}, error) {
+					// Require admin (clearanceLevel >= 5)
+					claims, ok := p.Context.Value(auth.UserClaimsKey).(*auth.Claims)
+					if !ok || claims == nil || claims.ClearanceLevel < 5 {
+						return nil, fmt.Errorf("admin access required")
+					}
+
+					title := p.Args["title"].(string)
+					body := p.Args["body"].(string)
+
+					ntype := "info"
+					if v, ok := p.Args["notifType"].(string); ok && v != "" {
+						ntype = v
+					}
+
+					targetUserID := 0
+					if v, ok := p.Args["userId"].(int); ok {
+						targetUserID = v
+					}
+
+					// Build data payload with type
+					data := map[string]string{"type": ntype}
+
+					if targetUserID > 0 {
+						// Send to a single user (bypass sleep/throttle for admin)
+						tokens, err := notifs.GetUserTokens(p.Context, targetUserID)
+						if err != nil {
+							return 0, err
+						}
+						if len(tokens) == 0 {
+							return 0, nil
+						}
+						msgs := make([]notifications.PushMessage, len(tokens))
+						for i, tk := range tokens {
+							msgs[i] = notifications.PushMessage{
+								To:    tk.Token,
+								Title: title,
+								Body:  body,
+								Data:  data,
+								Sound: "default",
+							}
+						}
+						if err := notifs.SendExpoPushPublic(msgs); err != nil {
+							return 0, err
+						}
+						return 1, nil
+					}
+
+					// Send to ALL users
+					var userIDs []int
+					if err := db.SelectContext(p.Context, &userIDs, "SELECT UserId FROM Users"); err != nil {
+						return 0, fmt.Errorf("failed to list users: %w", err)
+					}
+					count := 0
+					for _, uid := range userIDs {
+						tokens, err := notifs.GetUserTokens(p.Context, uid)
+						if err != nil || len(tokens) == 0 {
+							continue
+						}
+						msgs := make([]notifications.PushMessage, len(tokens))
+						for i, tk := range tokens {
+							msgs[i] = notifications.PushMessage{
+								To:    tk.Token,
+								Title: title,
+								Body:  body,
+								Data:  data,
+								Sound: "default",
+							}
+						}
+						if err := notifs.SendExpoPushPublic(msgs); err == nil {
+							count++
+						}
+					}
+					return count, nil
 				},
 			},
 		},

@@ -94,7 +94,7 @@ func main() {
 	}
 	log.Println("chat hub initialised")
 
-	schema, err := gql.NewSchema(dbConn)
+	schema, err := gql.NewSchema(dbConn, notifService)
 	if err != nil {
 		log.Fatalf("graphql schema failed: %v", err)
 	}

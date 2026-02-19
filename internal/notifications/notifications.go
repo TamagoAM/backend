@@ -234,6 +234,11 @@ func (s *Service) sendExpoPush(messages []PushMessage) error {
 	return nil
 }
 
+// SendExpoPushPublic is a public wrapper around sendExpoPush for admin use.
+func (s *Service) SendExpoPushPublic(messages []PushMessage) error {
+	return s.sendExpoPush(messages)
+}
+
 // logNotification records that a notification was sent (for throttling).
 func (s *Service) logNotification(ctx context.Context, userID int, notifType NotifType) {
 	// Find current escalation level
