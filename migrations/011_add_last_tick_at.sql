@@ -3,7 +3,7 @@
 -- ═══════════════════════════════════════════════════
 
 ALTER TABLE Tama_stats
-    ADD COLUMN IF NOT EXISTS LastTickAt DATETIME DEFAULT NULL;
+    ADD COLUMN LastTickAt DATETIME DEFAULT NULL;
 
 -- Initialise existing rows: set LastTickAt to the most recent activity timestamp
 -- so the first ticker run doesn't apply a huge retroactive decay.
