@@ -16,20 +16,36 @@ import (
 // ─── Message types ─────────────────────────────────────────
 
 type IncomingMessage struct {
-	Type       string `json:"type"`       // "chat" | "typing" | "read"
+	Type       string `json:"type"`       // "chat" | "typing" | "read" | "game_*"
 	ReceiverID int    `json:"receiverId"` // who we're talking to
 	Body       string `json:"body,omitempty"`
 	MessageID  int    `json:"messageId,omitempty"` // for read receipts
+
+	// ── Game fields ──
+	GameType   string          `json:"gameType,omitempty"`
+	InviteID   string          `json:"inviteId,omitempty"`
+	SessionID  string          `json:"sessionId,omitempty"`
+	SenderName string          `json:"senderName,omitempty"`
+	Move       json.RawMessage `json:"move,omitempty"`
+	WinnerID   *int            `json:"winnerId,omitempty"`
 }
 
 type OutgoingMessage struct {
-	Type       string `json:"type"` // "chat" | "typing" | "read" | "online" | "offline"
+	Type       string `json:"type"` // "chat" | "typing" | "read" | "online" | "offline" | "game_*"
 	SenderID   int    `json:"senderId"`
 	ReceiverID int    `json:"receiverId,omitempty"`
 	Body       string `json:"body,omitempty"`
 	MessageID  int    `json:"messageId,omitempty"`
 	SentAt     string `json:"sentAt,omitempty"`
 	ReadAt     string `json:"readAt,omitempty"`
+
+	// ── Game fields (relayed as-is) ──
+	GameType   string          `json:"gameType,omitempty"`
+	InviteID   string          `json:"inviteId,omitempty"`
+	SessionID  string          `json:"sessionId,omitempty"`
+	SenderName string          `json:"senderName,omitempty"`
+	Move       json.RawMessage `json:"move,omitempty"`
+	WinnerID   *int            `json:"winnerId,omitempty"`
 }
 
 // AdminMessage is sent from admin panel → player via WebSocket
@@ -116,6 +132,8 @@ func (h *Hub) HandleMessage(senderID int, raw []byte) {
 		h.handleTyping(senderID, msg)
 	case "read":
 		h.handleRead(senderID, msg)
+	case "game_invite", "game_accept", "game_decline", "game_move", "game_state", "game_end":
+		h.handleGameRelay(senderID, msg)
 	default:
 		log.Printf("[chat] unknown message type %q from user %d", msg.Type, senderID)
 	}
@@ -202,6 +220,43 @@ func (h *Hub) handleRead(senderID int, msg IncomingMessage) {
 }
 
 // ─── Presence ──────────────────────────────────────────────
+
+// ─── Game relay ────────────────────────────────────────────
+
+// handleGameRelay relays game messages between two players.
+// The server does NOT validate moves — it acts as a thin relay
+// so both clients handle game logic locally.
+func (h *Hub) handleGameRelay(senderID int, msg IncomingMessage) {
+	if msg.ReceiverID == 0 {
+		log.Printf("[game] %s from user %d missing receiverId", msg.Type, senderID)
+		return
+	}
+
+	out := OutgoingMessage{
+		Type:       msg.Type,
+		SenderID:   senderID,
+		ReceiverID: msg.ReceiverID,
+		GameType:   msg.GameType,
+		InviteID:   msg.InviteID,
+		SessionID:  msg.SessionID,
+		SenderName: msg.SenderName,
+		Move:       msg.Move,
+		WinnerID:   msg.WinnerID,
+	}
+
+	log.Printf("[game] relay %s from user %d → user %d (session=%s)",
+		msg.Type, senderID, msg.ReceiverID, msg.SessionID)
+
+	// Deliver to receiver
+	h.deliverToUser(msg.ReceiverID, out)
+
+	// For accept messages, also echo back to sender with the session info
+	if msg.Type == "game_accept" {
+		h.deliverToUser(senderID, out)
+	}
+}
+
+// ─── Presence (continued) ──────────────────────────────────
 
 func (h *Hub) broadcastPresence(userID int, status string) {
 	// Get user's accepted friends
