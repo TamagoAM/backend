@@ -1,16 +1,17 @@
 -- ═══════════════════════════════════════════════════
 -- 012_night_cycle_notifications.sql
 -- Day/night cycle + Expo Push Notifications
+-- MySQL 8.x compatible (no IF NOT EXISTS on ALTER TABLE)
+-- Re-runnable: errors on duplicate columns are swallowed by Migrate()
 -- ═══════════════════════════════════════════════════
 
 -- Store user timezone (IANA format, e.g. "Europe/Paris")
-ALTER TABLE Users
-  ADD COLUMN IF NOT EXISTS Timezone VARCHAR(64) DEFAULT 'Europe/Paris';
+ALTER TABLE Users ADD COLUMN Timezone VARCHAR(64) DEFAULT 'Europe/Paris';
 
 -- Lights on/off state for the night cycle
-ALTER TABLE Tama_stats
-  ADD COLUMN IF NOT EXISTS LightsOff BOOLEAN DEFAULT FALSE,
-  ADD COLUMN IF NOT EXISTS LightsOffAt DATETIME NULL;
+ALTER TABLE Tama_stats ADD COLUMN LightsOff BOOLEAN DEFAULT FALSE;
+
+ALTER TABLE Tama_stats ADD COLUMN LightsOffAt DATETIME NULL;
 
 -- Expo push tokens (one user may have multiple devices)
 CREATE TABLE IF NOT EXISTS PushToken (
