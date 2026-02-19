@@ -45,6 +45,7 @@ type TamaStat struct {
 	WorkSatis     float64    `db:"WorkSatis"`
 	PersonalSatis float64    `db:"PersonalSatis"`
 	Happiness     float64    `db:"Happiness"`
+	LastTickAt    *time.Time `db:"LastTickAt"`
 }
 
 type Tama struct {

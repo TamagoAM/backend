@@ -412,6 +412,12 @@ func NewSchema(db *sqlx.DB) (graphql.Schema, error) {
 				}
 				return nil, nil
 			}},
+			"lastTickAt": &graphql.Field{Type: graphql.String, Resolve: func(p graphql.ResolveParams) (interface{}, error) {
+				if s, ok := sourceAs[models.TamaStat](p.Source); ok {
+					return formatTimeValue(s.LastTickAt), nil
+				}
+				return nil, nil
+			}},
 		},
 	})
 
@@ -1342,6 +1348,23 @@ func NewSchema(db *sqlx.DB) (graphql.Schema, error) {
 						}
 					}
 					return store.StatHistoryByTama(p.Context, tamaID, since)
+				},
+			},
+			// ─── syncTamaStats: returns backend-authoritative stats for a tama ──
+			"syncTamaStats": &graphql.Field{
+				Type:        tamaStatType,
+				Description: "Returns the backend's authoritative stats for a tama (decayed by the background ticker). Use this to sync the frontend with the server.",
+				Args: graphql.FieldConfigArgument{
+					"tamaId": &graphql.ArgumentConfig{Type: graphql.NewNonNull(graphql.Int)},
+				},
+				Resolve: func(p graphql.ResolveParams) (interface{}, error) {
+					tamaID := p.Args["tamaId"].(int)
+					// Look up the tama to get the stats ID
+					tama, err := store.GetTama(p.Context, tamaID)
+					if err != nil {
+						return nil, fmt.Errorf("tama %d not found: %w", tamaID, err)
+					}
+					return store.GetTamaStat(p.Context, tama.TamaStatsID)
 				},
 			},
 		},

@@ -15,11 +15,14 @@ import (
 	"github.com/gofiber/websocket/v2"
 	"github.com/graphql-go/handler"
 
+	"time"
+
 	"tamagoam/internal/auth"
 	"tamagoam/internal/chat"
 	"tamagoam/internal/config"
 	"tamagoam/internal/db"
 	gql "tamagoam/internal/graphql"
+	"tamagoam/internal/ticker"
 )
 
 func main() {
@@ -64,8 +67,17 @@ func main() {
 		if err := db.Migrate(dbConn, "migrations/010_stat_history.sql"); err != nil {
 			log.Fatalf("db migrate 010 failed: %v", err)
 		}
+		if err := db.Migrate(dbConn, "migrations/011_add_last_tick_at.sql"); err != nil {
+			log.Fatalf("db migrate 011 failed: %v", err)
+		}
 	}
 	log.Println("db migrated")
+
+	// ─── Background Ticker (decay engine) ────────────────────
+	gameTicker := ticker.New(dbConn, 5*time.Minute)
+	gameTicker.Start()
+	defer gameTicker.Stop()
+	log.Println("game ticker started (5m interval)")
 
 	// ─── Chat Hub (WebSocket + Redis) ─────────────────────────
 	chatHub, err := chat.NewHub(dbConn, cfg.RedisURL)
