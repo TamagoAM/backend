@@ -22,6 +22,7 @@ import (
 	"tamagoam/internal/config"
 	"tamagoam/internal/db"
 	gql "tamagoam/internal/graphql"
+	"tamagoam/internal/notifications"
 	"tamagoam/internal/ticker"
 )
 
@@ -70,11 +71,18 @@ func main() {
 		if err := db.Migrate(dbConn, "migrations/011_add_last_tick_at.sql"); err != nil {
 			log.Fatalf("db migrate 011 failed: %v", err)
 		}
+		if err := db.Migrate(dbConn, "migrations/012_night_cycle_notifications.sql"); err != nil {
+			log.Fatalf("db migrate 012 failed: %v", err)
+		}
 	}
 	log.Println("db migrated")
 
+	// ─── Notification Service ─────────────────────────────────
+	notifService := notifications.NewService(dbConn)
+	log.Println("notification service initialised")
+
 	// ─── Background Ticker (decay engine) ────────────────────
-	gameTicker := ticker.New(dbConn, 5*time.Minute)
+	gameTicker := ticker.New(dbConn, 5*time.Minute, notifService)
 	gameTicker.Start()
 	defer gameTicker.Stop()
 	log.Println("game ticker started (5m interval)")

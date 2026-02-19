@@ -15,6 +15,7 @@ type User struct {
 	GamingTime         int        `db:"GamingTime"`
 	CreationDate       time.Time  `db:"CreationDate"`
 	LastConnectionDate *time.Time `db:"LastConnectionDate"`
+	Timezone           string     `db:"Timezone"`
 }
 
 type Race struct {
@@ -46,6 +47,16 @@ type TamaStat struct {
 	PersonalSatis float64    `db:"PersonalSatis"`
 	Happiness     float64    `db:"Happiness"`
 	LastTickAt    *time.Time `db:"LastTickAt"`
+	LightsOff     bool       `db:"LightsOff"`
+	LightsOffAt   *time.Time `db:"LightsOffAt"`
+}
+
+type PushToken struct {
+	TokenID   int       `db:"TokenId"`
+	UserID    int       `db:"UserId"`
+	Token     string    `db:"Token"`
+	Platform  string    `db:"Platform"`
+	CreatedAt time.Time `db:"CreatedAt"`
 }
 
 type Tama struct {

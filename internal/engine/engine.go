@@ -18,19 +18,27 @@ func ProcessTick(stats TamaStats, isSick bool, now time.Time, ctx *GameContext) 
 		mods = ctx.Mods
 	}
 
-	// 3. Apply decay
-	current := ApplyDecay(stats, hours, isSick, mods)
+	// 3. Apply decay (with night cycle if context available)
+	var loc *time.Location
+	if ctx != nil && ctx.Timezone != "" {
+		loc, _ = time.LoadLocation(ctx.Timezone)
+	}
+	current := ApplyDecayWithNight(stats, hours, isSick, mods, ctx, loc, now)
 
-	// 4. Random events
-	eventResult := ProcessRandomEvents(current, isSick, ctx)
-	current = eventResult.Stats
-	events = append(events, eventResult.Events...)
+	// 4. Random events (skip during sleep)
+	if ctx == nil || !ctx.LightsOff || !ctx.IsNight {
+		eventResult := ProcessRandomEvents(current, isSick, ctx)
+		current = eventResult.Stats
+		events = append(events, eventResult.Events...)
 
-	nowSick := isSick || eventResult.BecameSick
+		isSick = isSick || eventResult.BecameSick
+		if eventResult.SicknessName != nil {
+			// pass through
+		}
+	}
+
 	var sickName *string
-	if eventResult.SicknessName != nil {
-		sickName = eventResult.SicknessName
-	} else if isSick && ctx != nil && ctx.CurrentSickness != nil {
+	if isSick && ctx != nil && ctx.CurrentSickness != nil {
 		sickName = &ctx.CurrentSickness.Name
 	}
 
@@ -59,7 +67,7 @@ func ProcessTick(stats TamaStats, isSick bool, now time.Time, ctx *GameContext) 
 	return TickResult{
 		Stats:        current,
 		IsDead:       isDead,
-		IsSick:       nowSick,
+		IsSick:       isSick,
 		SicknessName: sickName,
 		Happiness:    happiness,
 		Events:       events,
@@ -76,19 +84,24 @@ func ProcessTickForHours(stats TamaStats, hours float64, isSick bool, ctx *GameC
 		mods = ctx.Mods
 	}
 
-	// Apply decay for the given hours
-	current := ApplyDecay(stats, hours, isSick, mods)
+	// Apply decay with night cycle
+	var loc *time.Location
+	if ctx != nil && ctx.Timezone != "" {
+		loc, _ = time.LoadLocation(ctx.Timezone)
+	}
+	current := ApplyDecayWithNight(stats, hours, isSick, mods, ctx, loc, time.Now())
 
-	// Random events
-	eventResult := ProcessRandomEvents(current, isSick, ctx)
-	current = eventResult.Stats
-	events = append(events, eventResult.Events...)
+	// Random events (skip during sleep)
+	if ctx == nil || !ctx.LightsOff || !ctx.IsNight {
+		eventResult := ProcessRandomEvents(current, isSick, ctx)
+		current = eventResult.Stats
+		events = append(events, eventResult.Events...)
 
-	nowSick := isSick || eventResult.BecameSick
+		isSick = isSick || eventResult.BecameSick
+	}
+
 	var sickName *string
-	if eventResult.SicknessName != nil {
-		sickName = eventResult.SicknessName
-	} else if isSick && ctx != nil && ctx.CurrentSickness != nil {
+	if isSick && ctx != nil && ctx.CurrentSickness != nil {
 		sickName = &ctx.CurrentSickness.Name
 	}
 
@@ -116,7 +129,7 @@ func ProcessTickForHours(stats TamaStats, hours float64, isSick bool, ctx *GameC
 	return TickResult{
 		Stats:        current,
 		IsDead:       isDead,
-		IsSick:       nowSick,
+		IsSick:       isSick,
 		SicknessName: sickName,
 		Happiness:    happiness,
 		Events:       events,

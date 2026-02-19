@@ -418,6 +418,18 @@ func NewSchema(db *sqlx.DB) (graphql.Schema, error) {
 				}
 				return nil, nil
 			}},
+			"lightsOff": &graphql.Field{Type: graphql.Boolean, Resolve: func(p graphql.ResolveParams) (interface{}, error) {
+				if s, ok := sourceAs[models.TamaStat](p.Source); ok {
+					return s.LightsOff, nil
+				}
+				return nil, nil
+			}},
+			"lightsOffAt": &graphql.Field{Type: graphql.String, Resolve: func(p graphql.ResolveParams) (interface{}, error) {
+				if s, ok := sourceAs[models.TamaStat](p.Source); ok {
+					return formatTimeValue(s.LightsOffAt), nil
+				}
+				return nil, nil
+			}},
 		},
 	})
 
@@ -2985,6 +2997,75 @@ func NewSchema(db *sqlx.DB) (graphql.Schema, error) {
 						}
 					}
 					return store.CreateStatHistory(p.Context, input)
+				},
+			},
+
+			// ─── Night cycle: toggle lights ────────────────────────
+			"toggleLights": &graphql.Field{
+				Type:        graphql.Boolean,
+				Description: "Toggle lights on/off for a tama's night cycle. Returns the new lightsOff state.",
+				Args: graphql.FieldConfigArgument{
+					"tamaId": &graphql.ArgumentConfig{Type: graphql.NewNonNull(graphql.Int)},
+				},
+				Resolve: func(p graphql.ResolveParams) (interface{}, error) {
+					tamaID := p.Args["tamaId"].(int)
+					tama, err := store.GetTama(p.Context, tamaID)
+					if err != nil {
+						return nil, fmt.Errorf("tama %d not found: %w", tamaID, err)
+					}
+					stat, err := store.GetTamaStat(p.Context, tama.TamaStatsID)
+					if err != nil {
+						return nil, err
+					}
+					newState := !stat.LightsOff
+					return newState, store.SetLightsOff(p.Context, stat.TamaStatID, newState)
+				},
+			},
+
+			// ─── Timezone: update user timezone ────────────────────
+			"updateTimezone": &graphql.Field{
+				Type:        graphql.Boolean,
+				Description: "Update the user's IANA timezone (e.g. 'Europe/Paris', 'America/New_York').",
+				Args: graphql.FieldConfigArgument{
+					"userId":   &graphql.ArgumentConfig{Type: graphql.NewNonNull(graphql.Int)},
+					"timezone": &graphql.ArgumentConfig{Type: graphql.NewNonNull(graphql.String)},
+				},
+				Resolve: func(p graphql.ResolveParams) (interface{}, error) {
+					userID := p.Args["userId"].(int)
+					tz := p.Args["timezone"].(string)
+					return true, store.UpdateTimezone(p.Context, userID, tz)
+				},
+			},
+
+			// ─── Push notifications: register token ────────────────
+			"registerPushToken": &graphql.Field{
+				Type:        graphql.Boolean,
+				Description: "Register an Expo push token for a user's device.",
+				Args: graphql.FieldConfigArgument{
+					"userId":   &graphql.ArgumentConfig{Type: graphql.NewNonNull(graphql.Int)},
+					"token":    &graphql.ArgumentConfig{Type: graphql.NewNonNull(graphql.String)},
+					"platform": &graphql.ArgumentConfig{Type: graphql.NewNonNull(graphql.String)},
+				},
+				Resolve: func(p graphql.ResolveParams) (interface{}, error) {
+					userID := p.Args["userId"].(int)
+					token := p.Args["token"].(string)
+					platform := p.Args["platform"].(string)
+					return true, store.RegisterPushToken(p.Context, userID, token, platform)
+				},
+			},
+
+			// ─── Push notifications: unregister token ──────────────
+			"unregisterPushToken": &graphql.Field{
+				Type:        graphql.Boolean,
+				Description: "Remove an Expo push token for a user's device.",
+				Args: graphql.FieldConfigArgument{
+					"userId": &graphql.ArgumentConfig{Type: graphql.NewNonNull(graphql.Int)},
+					"token":  &graphql.ArgumentConfig{Type: graphql.NewNonNull(graphql.String)},
+				},
+				Resolve: func(p graphql.ResolveParams) (interface{}, error) {
+					userID := p.Args["userId"].(int)
+					token := p.Args["token"].(string)
+					return true, store.UnregisterPushToken(p.Context, userID, token)
 				},
 			},
 		},

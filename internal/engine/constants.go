@@ -73,6 +73,22 @@ const EventChancePerTick = 0.008
 const LifeChoiceChancePerTick = 0.015
 const CongenitalChance = 0.15
 
+// ─── Night Cycle ─────────────────────────────────
+const NightStartHour = 22 // 10 PM local time
+const NightEndHour = 10   // 10 AM local time
+
+// When lights are off at night: decay paused + happiness regen
+const SleepHappinessRegenPerHour = 0.5
+
+// When lights are ON at night (user forgot): 1.5x happiness decay
+const NightPenaltyHappinessMultiplier = 1.5
+
+// ─── Notification stat thresholds ────────────────
+const NotifLowHungerThreshold = 20.0
+const NotifLowHappinessThreshold = 20.0
+const NotifHighBoredomThreshold = 80.0
+const NotifLowHygieneThreshold = 20.0
+
 // ─── Random sicknesses (fallback) ────────────────────
 var RandomSicknesses = []string{
 	"Common Cold", "Tummy Ache", "Pixel Flu", "Sniffles",

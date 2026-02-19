@@ -97,6 +97,12 @@ type Store interface {
 	// Stat history
 	CreateStatHistory(ctx context.Context, input CreateStatHistoryInput) (*models.StatHistory, error)
 	StatHistoryByTama(ctx context.Context, tamaID int, since *time.Time) ([]models.StatHistory, error)
+
+	// Night cycle & notifications
+	SetLightsOff(ctx context.Context, tamaStatID int, lightsOff bool) error
+	UpdateTimezone(ctx context.Context, userID int, timezone string) error
+	RegisterPushToken(ctx context.Context, userID int, token string, platform string) error
+	UnregisterPushToken(ctx context.Context, userID int, token string) error
 }
 
 type SQLStore struct {
@@ -882,4 +888,32 @@ func (s *SQLStore) StatHistoryByTama(ctx context.Context, tamaID int, since *tim
 	}
 	err := s.db.SelectContext(ctx, &hist, "SELECT * FROM StatHistory WHERE TamaId = ? ORDER BY RecordedAt ASC", tamaID)
 	return hist, err
+}
+
+// ─── Night cycle & Notifications ──────────────────
+
+func (s *SQLStore) SetLightsOff(ctx context.Context, tamaStatID int, lightsOff bool) error {
+	if lightsOff {
+		_, err := s.db.ExecContext(ctx, "UPDATE Tama_stats SET LightsOff = TRUE, LightsOffAt = NOW() WHERE TamaStatId = ?", tamaStatID)
+		return err
+	}
+	_, err := s.db.ExecContext(ctx, "UPDATE Tama_stats SET LightsOff = FALSE, LightsOffAt = NULL WHERE TamaStatId = ?", tamaStatID)
+	return err
+}
+
+func (s *SQLStore) UpdateTimezone(ctx context.Context, userID int, timezone string) error {
+	_, err := s.db.ExecContext(ctx, "UPDATE Users SET Timezone = ? WHERE UserId = ?", timezone, userID)
+	return err
+}
+
+func (s *SQLStore) RegisterPushToken(ctx context.Context, userID int, token string, platform string) error {
+	_, err := s.db.ExecContext(ctx,
+		"INSERT INTO PushToken (UserId, Token, Platform) VALUES (?, ?, ?) ON DUPLICATE KEY UPDATE Platform = VALUES(Platform), CreatedAt = NOW()",
+		userID, token, platform)
+	return err
+}
+
+func (s *SQLStore) UnregisterPushToken(ctx context.Context, userID int, token string) error {
+	_, err := s.db.ExecContext(ctx, "DELETE FROM PushToken WHERE UserId = ? AND Token = ?", userID, token)
+	return err
 }

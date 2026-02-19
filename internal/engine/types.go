@@ -97,4 +97,25 @@ type GameContext struct {
 	ChoicesMade     map[int]bool // set of life choice IDs
 	CurrentSickness *DBSickness
 	Friends         *FriendContext
+
+	// Night cycle
+	LightsOff bool   // user turned lights off
+	IsNight   bool   // current time is in night window (22:00-10:00 user local)
+	Timezone  string // IANA timezone string
+}
+
+// NightCycleResult stores what happened during night processing.
+type NightCycleResult struct {
+	NightHoursSleeping float64 // hours with lights off (paused + regen)
+	NightHoursAwake    float64 // hours with lights on at night (penalty)
+	DayHours           float64 // normal daytime hours
+}
+
+// IsNightHour checks if a given hour (0-23) is within the night window.
+func IsNightHour(hour int) bool {
+	// Night window: 22:00 - 10:00 (wraps midnight)
+	if NightStartHour > NightEndHour {
+		return hour >= NightStartHour || hour < NightEndHour
+	}
+	return hour >= NightStartHour && hour < NightEndHour
 }

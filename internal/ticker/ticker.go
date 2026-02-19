@@ -8,6 +8,7 @@ import (
 	"github.com/jmoiron/sqlx"
 
 	"tamagoam/internal/engine"
+	"tamagoam/internal/notifications"
 )
 
 // AliveTama holds a joined row of Tama + TamaStat for the background ticker.
@@ -42,6 +43,11 @@ type AliveTama struct {
 	PersonalSatis float64    `db:"PersonalSatis"`
 	Happiness     float64    `db:"Happiness"`
 	LastTickAt    *time.Time `db:"LastTickAt"`
+	LightsOff     bool       `db:"LightsOff"`
+	LightsOffAt   *time.Time `db:"LightsOffAt"`
+
+	// User fields for night cycle
+	Timezone string `db:"Timezone"`
 }
 
 // DBSicknessRow mirrors the Sickness table for loading game data.
@@ -87,14 +93,16 @@ type Ticker struct {
 	db       *sqlx.DB
 	interval time.Duration
 	stop     chan struct{}
+	notifs   *notifications.Service
 }
 
 // New creates a new Ticker.
-func New(db *sqlx.DB, interval time.Duration) *Ticker {
+func New(db *sqlx.DB, interval time.Duration, notifs *notifications.Service) *Ticker {
 	return &Ticker{
 		db:       db,
 		interval: interval,
 		stop:     make(chan struct{}),
+		notifs:   notifs,
 	}
 }
 
@@ -148,17 +156,48 @@ func (t *Ticker) tick() {
 	sickened := 0
 
 	for _, tama := range tamas {
-		result, err := t.processTama(ctx, tama, now, sicknesses, events, choices)
+		// Determine if it's nighttime in the user's timezone
+		tz := tama.Timezone
+		if tz == "" {
+			tz = "Europe/Paris"
+		}
+		loc, err := time.LoadLocation(tz)
+		if err != nil {
+			loc = time.UTC
+		}
+		localNow := now.In(loc)
+		localHour := localNow.Hour()
+		isNight := engine.IsNightHour(localHour)
+
+		// Send bedtime/wake reminders at boundary hours
+		if t.notifs != nil {
+			if localHour == engine.NightStartHour && !tama.LightsOff {
+				t.notifs.SendBedtimeReminder(ctx, tama.UserID, tama.Name)
+			}
+			if localHour == engine.NightEndHour && tama.LightsOff {
+				t.notifs.SendWakeUpReminder(ctx, tama.UserID, tama.Name)
+			}
+		}
+
+		wasSick := tama.Sickness != nil && *tama.Sickness != ""
+		result, err := t.processTama(ctx, tama, now, sicknesses, events, choices, isNight)
 		if err != nil {
 			log.Printf("[ticker] error processing tama %d (%s): %v", tama.TamaID, tama.Name, err)
 			continue
 		}
 		processed++
+
+		nowSick := result.IsSick
 		if result.IsDead {
 			deaths++
 		}
-		if result.IsSick && (tama.Sickness == nil || *tama.Sickness == "") {
+		if nowSick && !wasSick {
 			sickened++
+		}
+
+		// Send push notifications for stat thresholds
+		if t.notifs != nil {
+			t.notifs.CheckAndNotifyStats(ctx, tama.UserID, tama.Name, &result.Stats, result.Happiness, nowSick, wasSick, result.IsDead)
 		}
 	}
 
@@ -175,6 +214,7 @@ func (t *Ticker) processTama(
 	sicknesses []engine.DBSickness,
 	events []engine.DBEvent,
 	choices []engine.DBLifeChoice,
+	isNight bool,
 ) (*engine.TickResult, error) {
 	// Compute elapsed hours since last tick
 	var lastTick time.Time
@@ -219,6 +259,9 @@ func (t *Ticker) processTama(
 		CurrentStage: currentStage,
 		ChoicesMade:  choicesMade,
 		Friends:      friends,
+		LightsOff:    tama.LightsOff,
+		IsNight:      isNight,
+		Timezone:     tama.Timezone,
 	}
 
 	if isSick {
@@ -293,9 +336,13 @@ func (t *Ticker) loadAliveTamas(ctx context.Context) ([]AliveTama, error) {
 			ts.Hunger, ts.Boredom, ts.Hygiene, ts.Money,
 			ts.CarAccident, ts.WorkAccident,
 			ts.SocialSatis, ts.WorkSatis, ts.PersonalSatis, ts.Happiness,
-			ts.LastTickAt
+			ts.LastTickAt,
+			COALESCE(ts.LightsOff, FALSE) AS LightsOff,
+			ts.LightsOffAt,
+			COALESCE(u.Timezone, 'Europe/Paris') AS Timezone
 		FROM Tama t
 		JOIN Tama_stats ts ON t.TamaStatsID = ts.TamaStatId
+		JOIN Users u ON t.UserId = u.UserId
 		WHERE t.DeathDay IS NULL
 	`)
 	return tamas, err
