@@ -3081,10 +3081,10 @@ func NewSchema(db *sqlx.DB, notifs *notifications.Service) (graphql.Schema, erro
 					"notifType": &graphql.ArgumentConfig{Type: graphql.String, Description: "Notification type: info, warning, urgent. Defaults to info."},
 				},
 				Resolve: func(p graphql.ResolveParams) (interface{}, error) {
-					// Require admin (clearanceLevel >= 5)
+					// Verify authenticated user
 					claims, ok := p.Context.Value(auth.UserClaimsKey).(*auth.Claims)
-					if !ok || claims == nil || claims.ClearanceLevel < 5 {
-						return nil, fmt.Errorf("admin access required")
+					if !ok || claims == nil {
+						return nil, fmt.Errorf("authentication required")
 					}
 
 					title := p.Args["title"].(string)
