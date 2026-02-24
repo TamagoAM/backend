@@ -11,6 +11,7 @@ import (
 	"tamagoam/internal/auth"
 	"tamagoam/internal/models"
 	"tamagoam/internal/notifications"
+	storestream "tamagoam/internal/store"
 )
 
 type CreateUserInput struct {
@@ -185,7 +186,7 @@ func sourceAs[T any](src interface{}) (T, bool) {
 	return zero, false
 }
 
-func NewSchema(db *sqlx.DB, notifs *notifications.Service) (graphql.Schema, error) {
+func NewSchema(db *sqlx.DB, notifs *notifications.Service, redisStream *storestream.RedisStream) (graphql.Schema, error) {
 	store := NewSQLStore(db)
 
 	userType := graphql.NewObject(graphql.ObjectConfig{
@@ -1112,6 +1113,178 @@ func NewSchema(db *sqlx.DB, notifs *notifications.Service) (graphql.Schema, erro
 		},
 	})
 
+	// ─── Store & Payment GraphQL types ──────────────────────
+	storeItemType := graphql.NewObject(graphql.ObjectConfig{
+		Name: "StoreItem",
+		Fields: graphql.Fields{
+			"id": &graphql.Field{Type: graphql.Int, Resolve: func(p graphql.ResolveParams) (interface{}, error) {
+				if i, ok := sourceAs[models.StoreItem](p.Source); ok {
+					return i.ItemID, nil
+				}
+				return nil, nil
+			}},
+			"name": &graphql.Field{Type: graphql.String, Resolve: func(p graphql.ResolveParams) (interface{}, error) {
+				if i, ok := sourceAs[models.StoreItem](p.Source); ok {
+					return i.Name, nil
+				}
+				return nil, nil
+			}},
+			"description": &graphql.Field{Type: graphql.String, Resolve: func(p graphql.ResolveParams) (interface{}, error) {
+				if i, ok := sourceAs[models.StoreItem](p.Source); ok {
+					if i.Description != nil {
+						return *i.Description, nil
+					}
+					return nil, nil
+				}
+				return nil, nil
+			}},
+			"category": &graphql.Field{Type: graphql.String, Resolve: func(p graphql.ResolveParams) (interface{}, error) {
+				if i, ok := sourceAs[models.StoreItem](p.Source); ok {
+					return i.Category, nil
+				}
+				return nil, nil
+			}},
+			"price": &graphql.Field{Type: graphql.Int, Resolve: func(p graphql.ResolveParams) (interface{}, error) {
+				if i, ok := sourceAs[models.StoreItem](p.Source); ok {
+					return i.Price, nil
+				}
+				return nil, nil
+			}},
+			"currency": &graphql.Field{Type: graphql.String, Resolve: func(p graphql.ResolveParams) (interface{}, error) {
+				if i, ok := sourceAs[models.StoreItem](p.Source); ok {
+					return i.Currency, nil
+				}
+				return nil, nil
+			}},
+			"icon": &graphql.Field{Type: graphql.String, Resolve: func(p graphql.ResolveParams) (interface{}, error) {
+				if i, ok := sourceAs[models.StoreItem](p.Source); ok {
+					if i.Icon != nil {
+						return *i.Icon, nil
+					}
+					return nil, nil
+				}
+				return nil, nil
+			}},
+			"effect": &graphql.Field{Type: graphql.String, Resolve: func(p graphql.ResolveParams) (interface{}, error) {
+				if i, ok := sourceAs[models.StoreItem](p.Source); ok {
+					if i.Effect != nil {
+						return *i.Effect, nil
+					}
+					return nil, nil
+				}
+				return nil, nil
+			}},
+			"active": &graphql.Field{Type: graphql.Boolean, Resolve: func(p graphql.ResolveParams) (interface{}, error) {
+				if i, ok := sourceAs[models.StoreItem](p.Source); ok {
+					return i.Active, nil
+				}
+				return nil, nil
+			}},
+		},
+	})
+
+	paymentType := graphql.NewObject(graphql.ObjectConfig{
+		Name: "Payment",
+		Fields: graphql.Fields{
+			"id": &graphql.Field{Type: graphql.Int, Resolve: func(p graphql.ResolveParams) (interface{}, error) {
+				if pay, ok := sourceAs[models.Payment](p.Source); ok {
+					return pay.PaymentID, nil
+				}
+				return nil, nil
+			}},
+			"userId": &graphql.Field{Type: graphql.Int, Resolve: func(p graphql.ResolveParams) (interface{}, error) {
+				if pay, ok := sourceAs[models.Payment](p.Source); ok {
+					return pay.UserID, nil
+				}
+				return nil, nil
+			}},
+			"itemId": &graphql.Field{Type: graphql.Int, Resolve: func(p graphql.ResolveParams) (interface{}, error) {
+				if pay, ok := sourceAs[models.Payment](p.Source); ok {
+					return pay.ItemID, nil
+				}
+				return nil, nil
+			}},
+			"amount": &graphql.Field{Type: graphql.Int, Resolve: func(p graphql.ResolveParams) (interface{}, error) {
+				if pay, ok := sourceAs[models.Payment](p.Source); ok {
+					return pay.Amount, nil
+				}
+				return nil, nil
+			}},
+			"currency": &graphql.Field{Type: graphql.String, Resolve: func(p graphql.ResolveParams) (interface{}, error) {
+				if pay, ok := sourceAs[models.Payment](p.Source); ok {
+					return pay.Currency, nil
+				}
+				return nil, nil
+			}},
+			"status": &graphql.Field{Type: graphql.String, Resolve: func(p graphql.ResolveParams) (interface{}, error) {
+				if pay, ok := sourceAs[models.Payment](p.Source); ok {
+					return pay.Status, nil
+				}
+				return nil, nil
+			}},
+			"stripePaymentIntentId": &graphql.Field{Type: graphql.String, Resolve: func(p graphql.ResolveParams) (interface{}, error) {
+				if pay, ok := sourceAs[models.Payment](p.Source); ok {
+					if pay.StripePaymentIntentID != nil {
+						return *pay.StripePaymentIntentID, nil
+					}
+					return nil, nil
+				}
+				return nil, nil
+			}},
+			"errorMessage": &graphql.Field{Type: graphql.String, Resolve: func(p graphql.ResolveParams) (interface{}, error) {
+				if pay, ok := sourceAs[models.Payment](p.Source); ok {
+					if pay.ErrorMessage != nil {
+						return *pay.ErrorMessage, nil
+					}
+					return nil, nil
+				}
+				return nil, nil
+			}},
+			"createdAt": &graphql.Field{Type: graphql.String, Resolve: func(p graphql.ResolveParams) (interface{}, error) {
+				if pay, ok := sourceAs[models.Payment](p.Source); ok {
+					return formatTimeValue(&pay.CreatedAt), nil
+				}
+				return nil, nil
+			}},
+		},
+	})
+
+	userInventoryType := graphql.NewObject(graphql.ObjectConfig{
+		Name: "UserInventory",
+		Fields: graphql.Fields{
+			"id": &graphql.Field{Type: graphql.Int, Resolve: func(p graphql.ResolveParams) (interface{}, error) {
+				if inv, ok := sourceAs[models.UserInventory](p.Source); ok {
+					return inv.InventoryID, nil
+				}
+				return nil, nil
+			}},
+			"userId": &graphql.Field{Type: graphql.Int, Resolve: func(p graphql.ResolveParams) (interface{}, error) {
+				if inv, ok := sourceAs[models.UserInventory](p.Source); ok {
+					return inv.UserID, nil
+				}
+				return nil, nil
+			}},
+			"itemId": &graphql.Field{Type: graphql.Int, Resolve: func(p graphql.ResolveParams) (interface{}, error) {
+				if inv, ok := sourceAs[models.UserInventory](p.Source); ok {
+					return inv.ItemID, nil
+				}
+				return nil, nil
+			}},
+			"quantity": &graphql.Field{Type: graphql.Int, Resolve: func(p graphql.ResolveParams) (interface{}, error) {
+				if inv, ok := sourceAs[models.UserInventory](p.Source); ok {
+					return inv.Quantity, nil
+				}
+				return nil, nil
+			}},
+			"acquiredAt": &graphql.Field{Type: graphql.String, Resolve: func(p graphql.ResolveParams) (interface{}, error) {
+				if inv, ok := sourceAs[models.UserInventory](p.Source); ok {
+					return formatTimeValue(&inv.AcquiredAt), nil
+				}
+				return nil, nil
+			}},
+		},
+	})
+
 	queryType := graphql.NewObject(graphql.ObjectConfig{
 		Name: "Query",
 		Fields: graphql.Fields{
@@ -1378,6 +1551,47 @@ func NewSchema(db *sqlx.DB, notifs *notifications.Service) (graphql.Schema, erro
 						return nil, fmt.Errorf("tama %d not found: %w", tamaID, err)
 					}
 					return store.GetTamaStat(p.Context, tama.TamaStatsID)
+				},
+			},
+			// ─── Store queries ──────────────────────────────────────
+			"storeItems": &graphql.Field{
+				Type:        graphql.NewList(storeItemType),
+				Description: "List all active store items.",
+				Resolve: func(p graphql.ResolveParams) (interface{}, error) {
+					return store.ListStoreItems(p.Context)
+				},
+			},
+			"storeItem": &graphql.Field{
+				Type:        storeItemType,
+				Description: "Get a single store item by ID.",
+				Args: graphql.FieldConfigArgument{
+					"id": &graphql.ArgumentConfig{Type: graphql.NewNonNull(graphql.Int)},
+				},
+				Resolve: func(p graphql.ResolveParams) (interface{}, error) {
+					id := p.Args["id"].(int)
+					return store.GetStoreItem(p.Context, id)
+				},
+			},
+			"myPayments": &graphql.Field{
+				Type:        graphql.NewList(paymentType),
+				Description: "List all payments for the authenticated user.",
+				Resolve: func(p graphql.ResolveParams) (interface{}, error) {
+					claims, ok := p.Context.Value(auth.UserClaimsKey).(*auth.Claims)
+					if !ok || claims == nil {
+						return nil, fmt.Errorf("authentication required")
+					}
+					return store.PaymentsByUser(p.Context, claims.UserID)
+				},
+			},
+			"myInventory": &graphql.Field{
+				Type:        graphql.NewList(userInventoryType),
+				Description: "List all inventory items for the authenticated user.",
+				Resolve: func(p graphql.ResolveParams) (interface{}, error) {
+					claims, ok := p.Context.Value(auth.UserClaimsKey).(*auth.Claims)
+					if !ok || claims == nil {
+						return nil, fmt.Errorf("authentication required")
+					}
+					return store.UserInventoryByUser(p.Context, claims.UserID)
 				},
 			},
 		},
@@ -3154,6 +3368,62 @@ func NewSchema(db *sqlx.DB, notifs *notifications.Service) (graphql.Schema, erro
 						}
 					}
 					return count, nil
+				},
+			},
+
+			// ─── Store: purchase an item ───────────────────────────
+			"purchaseItem": &graphql.Field{
+				Type:        paymentType,
+				Description: "Initiate a store purchase. Creates a Payment record and publishes a payment request to Redis stream.",
+				Args: graphql.FieldConfigArgument{
+					"itemId": &graphql.ArgumentConfig{Type: graphql.NewNonNull(graphql.Int)},
+				},
+				Resolve: func(p graphql.ResolveParams) (interface{}, error) {
+					claims, ok := p.Context.Value(auth.UserClaimsKey).(*auth.Claims)
+					if !ok || claims == nil {
+						return nil, fmt.Errorf("authentication required")
+					}
+					itemID := p.Args["itemId"].(int)
+
+					// Get the store item
+					item, err := store.GetStoreItem(p.Context, itemID)
+					if err != nil {
+						return nil, fmt.Errorf("item %d not found: %w", itemID, err)
+					}
+					if !item.Active {
+						return nil, fmt.Errorf("item is no longer available")
+					}
+
+					// Get user info for the email
+					user, err := store.GetUser(p.Context, claims.UserID)
+					if err != nil {
+						return nil, fmt.Errorf("user not found: %w", err)
+					}
+
+					// Create the payment record
+					payment, err := store.CreatePayment(p.Context, claims.UserID, item.ItemID, item.Price, item.Currency)
+					if err != nil {
+						return nil, fmt.Errorf("failed to create payment: %w", err)
+					}
+
+					// Publish to Redis stream for the payment microservice
+					if redisStream != nil {
+						err = redisStream.PublishPaymentRequest(p.Context, storestream.PaymentRequest{
+							PaymentID: payment.PaymentID,
+							UserID:    claims.UserID,
+							ItemID:    item.ItemID,
+							Amount:    item.Price,
+							Currency:  item.Currency,
+							UserEmail: user.Email,
+							UserName:  user.UserName,
+							ItemName:  item.Name,
+						})
+						if err != nil {
+							return nil, fmt.Errorf("failed to enqueue payment: %w", err)
+						}
+					}
+
+					return payment, nil
 				},
 			},
 		},

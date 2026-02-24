@@ -216,3 +216,39 @@ type StatHistory struct {
 	Trigger       string    `db:"Trigger"`
 	RecordedAt    time.Time `db:"RecordedAt"`
 }
+
+// ─── Store & Payment models ────────────────────────────────
+
+type StoreItem struct {
+	ItemID      int       `db:"ItemId"`
+	Name        string    `db:"Name"`
+	Description *string   `db:"Description"`
+	Category    string    `db:"Category"`
+	Price       int       `db:"Price"`
+	Currency    string    `db:"Currency"`
+	Icon        *string   `db:"Icon"`
+	Effect      *string   `db:"Effect"`
+	Active      bool      `db:"Active"`
+	CreatedAt   time.Time `db:"CreatedAt"`
+}
+
+type Payment struct {
+	PaymentID             int       `db:"PaymentId"`
+	UserID                int       `db:"UserId"`
+	ItemID                int       `db:"ItemId"`
+	Amount                int       `db:"Amount"`
+	Currency              string    `db:"Currency"`
+	Status                string    `db:"Status"`
+	StripePaymentIntentID *string   `db:"StripePaymentIntentId"`
+	ErrorMessage          *string   `db:"ErrorMessage"`
+	CreatedAt             time.Time `db:"CreatedAt"`
+	UpdatedAt             time.Time `db:"UpdatedAt"`
+}
+
+type UserInventory struct {
+	InventoryID int       `db:"InventoryId"`
+	UserID      int       `db:"UserId"`
+	ItemID      int       `db:"ItemId"`
+	Quantity    int       `db:"Quantity"`
+	AcquiredAt  time.Time `db:"AcquiredAt"`
+}
