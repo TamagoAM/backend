@@ -23,6 +23,7 @@ import (
 	"tamagoam/internal/db"
 	gql "tamagoam/internal/graphql"
 	"tamagoam/internal/notifications"
+	storestream "tamagoam/internal/store"
 	"tamagoam/internal/ticker"
 )
 
@@ -74,6 +75,9 @@ func main() {
 		if err := db.Migrate(dbConn, "migrations/012_night_cycle_notifications.sql"); err != nil {
 			log.Fatalf("db migrate 012 failed: %v", err)
 		}
+		if err := db.Migrate(dbConn, "migrations/013_store_payments.sql"); err != nil {
+			log.Fatalf("db migrate 013 failed: %v", err)
+		}
 	}
 	log.Println("db migrated")
 
@@ -94,7 +98,25 @@ func main() {
 	}
 	log.Println("chat hub initialised")
 
-	schema, err := gql.NewSchema(dbConn, notifService)
+	// ─── Redis Stream (payment microservice) ─────────────────
+	redisStream, err := storestream.NewRedisStream(cfg.RedisURL)
+	if err != nil {
+		log.Printf("WARNING: Redis stream init failed (payment service won't work): %v", err)
+	}
+	if redisStream != nil {
+		defer redisStream.Close()
+		// Background consumer: listen for payment results
+		ctx, cancelStream := context.WithCancel(context.Background())
+		defer cancelStream()
+		go redisStream.ConsumePaymentResults(ctx, func(result storestream.PaymentResult) {
+			log.Printf("[payment-result] payment #%d status=%s for user %d",
+				result.PaymentID, result.Status, result.UserID)
+			// Could apply item effects here if needed
+		})
+		log.Println("payment result consumer started")
+	}
+
+	schema, err := gql.NewSchema(dbConn, notifService, redisStream)
 	if err != nil {
 		log.Fatalf("graphql schema failed: %v", err)
 	}

@@ -24,3 +24,35 @@ services:
     ports:
       - "6379:6379"
     command: ["redis-server", "--save", "60", "1", "--loglevel", "warning"]
+
+  # ─── Payment Microservice ──────────────────────────────────
+  payment:
+    build:
+      context: ../payment
+      dockerfile: Dockerfile
+    env_file:
+      - ../payment/.env
+    depends_on:
+      - mysql
+      - redis
+    restart: unless-stopped
+
+  # ─── Email Microservice ────────────────────────────────────
+  email:
+    build:
+      context: ../email
+      dockerfile: Dockerfile
+    env_file:
+      - ../email/.env
+    depends_on:
+      - redis
+      - mailhog
+    restart: unless-stopped
+
+  # ─── MailHog (dev SMTP + web UI) ───────────────────────────
+  mailhog:
+    image: mailhog/mailhog:latest
+    ports:
+      - "1025:1025"   # SMTP
+      - "8025:8025"   # Web UI
+    restart: unless-stopped

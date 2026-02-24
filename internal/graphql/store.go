@@ -103,6 +103,14 @@ type Store interface {
 	UpdateTimezone(ctx context.Context, userID int, timezone string) error
 	RegisterPushToken(ctx context.Context, userID int, token string, platform string) error
 	UnregisterPushToken(ctx context.Context, userID int, token string) error
+
+	// Store & payment
+	ListStoreItems(ctx context.Context) ([]models.StoreItem, error)
+	GetStoreItem(ctx context.Context, id int) (*models.StoreItem, error)
+	CreatePayment(ctx context.Context, userID, itemID, amount int, currency string) (*models.Payment, error)
+	GetPayment(ctx context.Context, id int) (*models.Payment, error)
+	PaymentsByUser(ctx context.Context, userID int) ([]models.Payment, error)
+	UserInventoryByUser(ctx context.Context, userID int) ([]models.UserInventory, error)
 }
 
 type SQLStore struct {
@@ -916,4 +924,58 @@ func (s *SQLStore) RegisterPushToken(ctx context.Context, userID int, token stri
 func (s *SQLStore) UnregisterPushToken(ctx context.Context, userID int, token string) error {
 	_, err := s.db.ExecContext(ctx, "DELETE FROM PushToken WHERE UserId = ? AND Token = ?", userID, token)
 	return err
+}
+
+// ─── Store & Payment methods ─────────────────────
+
+func (s *SQLStore) ListStoreItems(ctx context.Context) ([]models.StoreItem, error) {
+	var items []models.StoreItem
+	err := s.db.SelectContext(ctx, &items, "SELECT * FROM StoreItem WHERE Active = TRUE ORDER BY Category, Price")
+	return items, err
+}
+
+func (s *SQLStore) GetStoreItem(ctx context.Context, id int) (*models.StoreItem, error) {
+	var item models.StoreItem
+	err := s.db.GetContext(ctx, &item, "SELECT * FROM StoreItem WHERE ItemId = ?", id)
+	if err != nil {
+		return nil, err
+	}
+	return &item, nil
+}
+
+func (s *SQLStore) CreatePayment(ctx context.Context, userID, itemID, amount int, currency string) (*models.Payment, error) {
+	res, err := s.db.ExecContext(ctx,
+		"INSERT INTO Payment (UserId, ItemId, Amount, Currency, Status) VALUES (?, ?, ?, ?, 'pending')",
+		userID, itemID, amount, currency)
+	if err != nil {
+		return nil, err
+	}
+	id, _ := res.LastInsertId()
+	var payment models.Payment
+	err = s.db.GetContext(ctx, &payment, "SELECT * FROM Payment WHERE PaymentId = ?", id)
+	if err != nil {
+		return nil, err
+	}
+	return &payment, nil
+}
+
+func (s *SQLStore) GetPayment(ctx context.Context, id int) (*models.Payment, error) {
+	var payment models.Payment
+	err := s.db.GetContext(ctx, &payment, "SELECT * FROM Payment WHERE PaymentId = ?", id)
+	if err != nil {
+		return nil, err
+	}
+	return &payment, nil
+}
+
+func (s *SQLStore) PaymentsByUser(ctx context.Context, userID int) ([]models.Payment, error) {
+	var payments []models.Payment
+	err := s.db.SelectContext(ctx, &payments, "SELECT * FROM Payment WHERE UserId = ? ORDER BY CreatedAt DESC", userID)
+	return payments, err
+}
+
+func (s *SQLStore) UserInventoryByUser(ctx context.Context, userID int) ([]models.UserInventory, error) {
+	var items []models.UserInventory
+	err := s.db.SelectContext(ctx, &items, "SELECT * FROM UserInventory WHERE UserId = ?", userID)
+	return items, err
 }
