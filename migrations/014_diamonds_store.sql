@@ -1,5 +1,5 @@
 -- Add diamonds (premium currency) to Users table
-ALTER TABLE Users ADD COLUMN IF NOT EXISTS Diamonds INT NOT NULL DEFAULT 0;
+ALTER TABLE Users ADD COLUMN Diamonds INT NOT NULL DEFAULT 0;
 
 -- Remove old USD-based store items and re-seed with diamond items
 DELETE FROM UserInventory;
