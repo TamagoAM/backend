@@ -2,6 +2,7 @@ package graphql
 
 import (
 	"context"
+	"fmt"
 	"time"
 
 	"github.com/jmoiron/sqlx"
@@ -111,6 +112,15 @@ type Store interface {
 	GetPayment(ctx context.Context, id int) (*models.Payment, error)
 	PaymentsByUser(ctx context.Context, userID int) ([]models.Payment, error)
 	UserInventoryByUser(ctx context.Context, userID int) ([]models.UserInventory, error)
+
+	// Diamond currency
+	AddDiamonds(ctx context.Context, userID int, amount int) error
+	SpendDiamonds(ctx context.Context, userID int, amount int) error
+	GetDiamonds(ctx context.Context, userID int) (int, error)
+
+	// Inventory management
+	AddToInventory(ctx context.Context, userID int, itemID int) (*models.UserInventory, error)
+	UseInventoryItem(ctx context.Context, userID int, itemID int) error
 }
 
 type SQLStore struct {
@@ -978,4 +988,62 @@ func (s *SQLStore) UserInventoryByUser(ctx context.Context, userID int) ([]model
 	var items []models.UserInventory
 	err := s.db.SelectContext(ctx, &items, "SELECT * FROM UserInventory WHERE UserId = ?", userID)
 	return items, err
+}
+
+// ─── Diamond currency methods ────────────────────
+
+func (s *SQLStore) AddDiamonds(ctx context.Context, userID int, amount int) error {
+	_, err := s.db.ExecContext(ctx, "UPDATE Users SET Diamonds = Diamonds + ? WHERE UserId = ?", amount, userID)
+	return err
+}
+
+func (s *SQLStore) SpendDiamonds(ctx context.Context, userID int, amount int) error {
+	res, err := s.db.ExecContext(ctx, "UPDATE Users SET Diamonds = Diamonds - ? WHERE UserId = ? AND Diamonds >= ?", amount, userID, amount)
+	if err != nil {
+		return err
+	}
+	rows, _ := res.RowsAffected()
+	if rows == 0 {
+		return fmt.Errorf("not enough diamonds")
+	}
+	return nil
+}
+
+func (s *SQLStore) GetDiamonds(ctx context.Context, userID int) (int, error) {
+	var diamonds int
+	err := s.db.GetContext(ctx, &diamonds, "SELECT Diamonds FROM Users WHERE UserId = ?", userID)
+	return diamonds, err
+}
+
+// ─── Inventory management ────────────────────────
+
+func (s *SQLStore) AddToInventory(ctx context.Context, userID int, itemID int) (*models.UserInventory, error) {
+	_, err := s.db.ExecContext(ctx,
+		"INSERT INTO UserInventory (UserId, ItemId, Quantity) VALUES (?, ?, 1) ON DUPLICATE KEY UPDATE Quantity = Quantity + 1",
+		userID, itemID)
+	if err != nil {
+		return nil, err
+	}
+	var inv models.UserInventory
+	err = s.db.GetContext(ctx, &inv, "SELECT * FROM UserInventory WHERE UserId = ? AND ItemId = ?", userID, itemID)
+	if err != nil {
+		return nil, err
+	}
+	return &inv, nil
+}
+
+func (s *SQLStore) UseInventoryItem(ctx context.Context, userID int, itemID int) error {
+	// Decrement quantity; delete if it reaches 0
+	res, err := s.db.ExecContext(ctx,
+		"UPDATE UserInventory SET Quantity = Quantity - 1 WHERE UserId = ? AND ItemId = ? AND Quantity > 0", userID, itemID)
+	if err != nil {
+		return err
+	}
+	rows, _ := res.RowsAffected()
+	if rows == 0 {
+		return fmt.Errorf("item not in inventory or already used")
+	}
+	// Clean up zero-quantity rows
+	_, _ = s.db.ExecContext(ctx, "DELETE FROM UserInventory WHERE UserId = ? AND ItemId = ? AND Quantity <= 0", userID, itemID)
+	return nil
 }

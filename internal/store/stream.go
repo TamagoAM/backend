@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"log"
+	"strings"
 	"time"
 
 	"github.com/redis/go-redis/v9"
@@ -56,10 +57,15 @@ func NewRedisStream(redisURL string) (*RedisStream, error) {
 		return nil, fmt.Errorf("redis ping: %w", err)
 	}
 
-	// Create consumer group for reading payment results
-	_ = rdb.XGroupCreateMkStream(ctx, PaymentSuccessStream, "backend-api", "0").Err()
+	rs := &RedisStream{rdb: rdb}
 
-	return &RedisStream{rdb: rdb}, nil
+	// Best-effort consumer group creation at startup; ConsumePaymentResults
+	// will also ensure it exists before reading.
+	if err := rs.ensureConsumerGroup(ctx); err != nil {
+		log.Printf("[store-stream] warning: initial consumer group creation failed (will retry later): %v", err)
+	}
+
+	return rs, nil
 }
 
 // PublishPaymentRequest publishes a payment request for the payment microservice.
@@ -76,9 +82,23 @@ func (rs *RedisStream) PublishPaymentRequest(ctx context.Context, req PaymentReq
 	}).Err()
 }
 
+// ensureConsumerGroup creates the consumer group if it does not already exist.
+func (rs *RedisStream) ensureConsumerGroup(ctx context.Context) error {
+	err := rs.rdb.XGroupCreateMkStream(ctx, PaymentSuccessStream, "backend-api", "0").Err()
+	if err != nil && err.Error() != "BUSYGROUP Consumer Group name already exists" {
+		return fmt.Errorf("create consumer group: %w", err)
+	}
+	return nil
+}
+
 // ConsumePaymentResults reads payment results from the success stream.
 // This should be called in a background goroutine.
 func (rs *RedisStream) ConsumePaymentResults(ctx context.Context, handler func(PaymentResult)) {
+	// Ensure the consumer group exists before entering the read loop.
+	if err := rs.ensureConsumerGroup(ctx); err != nil {
+		log.Printf("[store-stream] initial consumer group setup failed: %v", err)
+	}
+
 	for {
 		select {
 		case <-ctx.Done():
@@ -97,7 +117,17 @@ func (rs *RedisStream) ConsumePaymentResults(ctx context.Context, handler func(P
 			if err == redis.Nil || ctx.Err() != nil {
 				continue
 			}
+			// If the consumer group was lost, re-create it and retry.
+			if isNoGroupError(err) {
+				log.Printf("[store-stream] consumer group missing, recreating...")
+				if cgErr := rs.ensureConsumerGroup(ctx); cgErr != nil {
+					log.Printf("[store-stream] failed to recreate consumer group: %v", cgErr)
+					time.Sleep(2 * time.Second)
+				}
+				continue
+			}
 			log.Printf("[store-stream] read error: %v", err)
+			time.Sleep(1 * time.Second)
 			continue
 		}
 
@@ -125,4 +155,9 @@ func (rs *RedisStream) ConsumePaymentResults(ctx context.Context, handler func(P
 // Close closes the Redis connection.
 func (rs *RedisStream) Close() error {
 	return rs.rdb.Close()
+}
+
+// isNoGroupError checks if the error is a NOGROUP error from Redis.
+func isNoGroupError(err error) bool {
+	return err != nil && strings.Contains(err.Error(), "NOGROUP")
 }

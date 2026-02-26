@@ -16,6 +16,7 @@ type User struct {
 	CreationDate       time.Time  `db:"CreationDate"`
 	LastConnectionDate *time.Time `db:"LastConnectionDate"`
 	Timezone           string     `db:"Timezone"`
+	Diamonds           int        `db:"Diamonds"`
 }
 
 type Race struct {
