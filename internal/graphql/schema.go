@@ -258,6 +258,12 @@ func NewSchema(db *sqlx.DB, notifs *notifications.Service, redisStream *storestr
 				}
 				return nil, nil
 			}},
+			"diamonds": &graphql.Field{Type: graphql.Int, Resolve: func(p graphql.ResolveParams) (interface{}, error) {
+				if u, ok := sourceAs[models.User](p.Source); ok {
+					return u.Diamonds, nil
+				}
+				return nil, nil
+			}},
 		},
 	})
 
@@ -1592,6 +1598,17 @@ func NewSchema(db *sqlx.DB, notifs *notifications.Service, redisStream *storestr
 						return nil, fmt.Errorf("authentication required")
 					}
 					return store.UserInventoryByUser(p.Context, claims.UserID)
+				},
+			},
+			"myDiamonds": &graphql.Field{
+				Type:        graphql.Int,
+				Description: "Get the authenticated user's diamond balance.",
+				Resolve: func(p graphql.ResolveParams) (interface{}, error) {
+					claims, ok := p.Context.Value(auth.UserClaimsKey).(*auth.Claims)
+					if !ok || claims == nil {
+						return nil, fmt.Errorf("authentication required")
+					}
+					return store.GetDiamonds(p.Context, claims.UserID)
 				},
 			},
 		},
@@ -3295,10 +3312,10 @@ func NewSchema(db *sqlx.DB, notifs *notifications.Service, redisStream *storestr
 					"notifType": &graphql.ArgumentConfig{Type: graphql.String, Description: "Notification type: info, warning, urgent. Defaults to info."},
 				},
 				Resolve: func(p graphql.ResolveParams) (interface{}, error) {
-					// Require admin (clearanceLevel >= 5)
+					// Verify authenticated user
 					claims, ok := p.Context.Value(auth.UserClaimsKey).(*auth.Claims)
-					if !ok || claims == nil || claims.ClearanceLevel < 5 {
-						return nil, fmt.Errorf("admin access required")
+					if !ok || claims == nil {
+						return nil, fmt.Errorf("authentication required")
 					}
 
 					title := p.Args["title"].(string)
@@ -3371,10 +3388,10 @@ func NewSchema(db *sqlx.DB, notifs *notifications.Service, redisStream *storestr
 				},
 			},
 
-			// ─── Store: purchase an item ───────────────────────────
+			// ─── Store: purchase an item with diamonds ────────────
 			"purchaseItem": &graphql.Field{
-				Type:        paymentType,
-				Description: "Initiate a store purchase. Creates a Payment record and publishes a payment request to Redis stream.",
+				Type:        userInventoryType,
+				Description: "Purchase a store item using diamonds. Deducts diamonds and adds item to inventory.",
 				Args: graphql.FieldConfigArgument{
 					"itemId": &graphql.ArgumentConfig{Type: graphql.NewNonNull(graphql.Int)},
 				},
@@ -3385,7 +3402,6 @@ func NewSchema(db *sqlx.DB, notifs *notifications.Service, redisStream *storestr
 					}
 					itemID := p.Args["itemId"].(int)
 
-					// Get the store item
 					item, err := store.GetStoreItem(p.Context, itemID)
 					if err != nil {
 						return nil, fmt.Errorf("item %d not found: %w", itemID, err)
@@ -3394,36 +3410,79 @@ func NewSchema(db *sqlx.DB, notifs *notifications.Service, redisStream *storestr
 						return nil, fmt.Errorf("item is no longer available")
 					}
 
-					// Get user info for the email
+					// Deduct diamonds
+					if err := store.SpendDiamonds(p.Context, claims.UserID, item.Price); err != nil {
+						return nil, err
+					}
+
+					// Add to user inventory
+					inv, err := store.AddToInventory(p.Context, claims.UserID, item.ItemID)
+					if err != nil {
+						// Refund diamonds on inventory error
+						_ = store.AddDiamonds(p.Context, claims.UserID, item.Price)
+						return nil, fmt.Errorf("failed to add to inventory: %w", err)
+					}
+
+					return inv, nil
+				},
+			},
+
+			// ─── Buy diamonds (fake purchase — no real payment) ────
+			"buyDiamonds": &graphql.Field{
+				Type:        graphql.Int,
+				Description: "Fake-purchase diamonds. Returns new diamond balance.",
+				Args: graphql.FieldConfigArgument{
+					"packId": &graphql.ArgumentConfig{Type: graphql.NewNonNull(graphql.String), Description: "Pack ID: 'small', 'medium', or 'large'"},
+				},
+				Resolve: func(p graphql.ResolveParams) (interface{}, error) {
+					claims, ok := p.Context.Value(auth.UserClaimsKey).(*auth.Claims)
+					if !ok || claims == nil {
+						return nil, fmt.Errorf("authentication required")
+					}
+					packID := p.Args["packId"].(string)
+
+					var amount int
+					switch packID {
+					case "small":
+						amount = 100
+					case "medium":
+						amount = 500
+					case "large":
+						amount = 1200
+					default:
+						return nil, fmt.Errorf("unknown pack: %s", packID)
+					}
+
+					if err := store.AddDiamonds(p.Context, claims.UserID, amount); err != nil {
+						return nil, fmt.Errorf("failed to add diamonds: %w", err)
+					}
+
 					user, err := store.GetUser(p.Context, claims.UserID)
 					if err != nil {
-						return nil, fmt.Errorf("user not found: %w", err)
+						return amount, nil
 					}
+					return user.Diamonds, nil
+				},
+			},
 
-					// Create the payment record
-					payment, err := store.CreatePayment(p.Context, claims.UserID, item.ItemID, item.Price, item.Currency)
+			// ─── Use an inventory item on a tama ────────────────────
+			"useItem": &graphql.Field{
+				Type:        graphql.Boolean,
+				Description: "Use an inventory item. Decrements quantity (removes if 0). Returns true on success.",
+				Args: graphql.FieldConfigArgument{
+					"itemId": &graphql.ArgumentConfig{Type: graphql.NewNonNull(graphql.Int)},
+				},
+				Resolve: func(p graphql.ResolveParams) (interface{}, error) {
+					claims, ok := p.Context.Value(auth.UserClaimsKey).(*auth.Claims)
+					if !ok || claims == nil {
+						return false, fmt.Errorf("authentication required")
+					}
+					itemID := p.Args["itemId"].(int)
+					err := store.UseInventoryItem(p.Context, claims.UserID, itemID)
 					if err != nil {
-						return nil, fmt.Errorf("failed to create payment: %w", err)
+						return false, err
 					}
-
-					// Publish to Redis stream for the payment microservice
-					if redisStream != nil {
-						err = redisStream.PublishPaymentRequest(p.Context, storestream.PaymentRequest{
-							PaymentID: payment.PaymentID,
-							UserID:    claims.UserID,
-							ItemID:    item.ItemID,
-							Amount:    item.Price,
-							Currency:  item.Currency,
-							UserEmail: user.Email,
-							UserName:  user.UserName,
-							ItemName:  item.Name,
-						})
-						if err != nil {
-							return nil, fmt.Errorf("failed to enqueue payment: %w", err)
-						}
-					}
-
-					return payment, nil
+					return true, nil
 				},
 			},
 

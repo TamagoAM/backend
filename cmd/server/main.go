@@ -78,6 +78,9 @@ func main() {
 		if err := db.Migrate(dbConn, "migrations/013_store_payments.sql"); err != nil {
 			log.Fatalf("db migrate 013 failed: %v", err)
 		}
+		if err := db.Migrate(dbConn, "migrations/014_diamonds_store.sql"); err != nil {
+			log.Fatalf("db migrate 014 failed: %v", err)
+		}
 	}
 	log.Println("db migrated")
 
