@@ -40,11 +40,12 @@ type PaymentResult struct {
 }
 
 // EmailRequest is the message published to trigger the email microservice directly.
+// Field names must match email/internal/models/models.go exactly.
 type EmailRequest struct {
-	Template  string            `json:"template"`
-	ToAddress string            `json:"to_address"`
-	ToName    string            `json:"to_name"`
-	Payload   map[string]string `json:"payload"`
+	To       string            `json:"to"`
+	Subject  string            `json:"subject"`
+	Template string            `json:"template"`
+	Data     map[string]string `json:"data"`
 }
 
 // RedisStream manages publishing payment requests and consuming results.

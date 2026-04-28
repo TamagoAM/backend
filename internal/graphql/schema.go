@@ -3423,6 +3423,23 @@ func NewSchema(db *sqlx.DB, notifs *notifications.Service, redisStream *storestr
 						return nil, fmt.Errorf("failed to add to inventory: %w", err)
 					}
 
+					// Send purchase confirmation email
+					if redisStream != nil {
+						if u, uErr := store.GetUser(p.Context, claims.UserID); uErr == nil {
+							_ = redisStream.PublishEmailRequest(p.Context, storestream.EmailRequest{
+								To:       u.Email,
+								Subject:  "🎉 Purchase Confirmed — TamagoAM",
+								Template: "payment_success",
+								Data: map[string]string{
+									"user_name":  u.UserName,
+									"item_name":  item.Name,
+									"amount":     fmt.Sprintf("%d 💎", item.Price),
+									"payment_id": fmt.Sprintf("%d", inv.InventoryID),
+								},
+							})
+						}
+					}
+
 					return inv, nil
 				},
 			},
@@ -3530,10 +3547,10 @@ func NewSchema(db *sqlx.DB, notifs *notifications.Service, redisStream *storestr
 
 					if redisStream != nil {
 						err = redisStream.PublishEmailRequest(p.Context, storestream.EmailRequest{
-							Template:  "tama_status",
-							ToAddress: toEmail,
-							ToName:    user.UserName,
-							Payload: map[string]string{
+							To:       toEmail,
+							Subject:  "💌 Your Tama Status Report — TamagoAM",
+							Template: "tama_status",
+							Data: map[string]string{
 								"user_name": user.UserName,
 								"tama_name": tama.Name,
 								"tama_race": tama.Race,
