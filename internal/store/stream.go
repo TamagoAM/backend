@@ -171,6 +171,16 @@ func (rs *RedisStream) Close() error {
 	return rs.rdb.Close()
 }
 
+// ensureConsumerGroup creates the backend-api consumer group for PaymentSuccessStream
+// if it does not already exist. BUSYGROUP (already exists) is silently ignored.
+func (rs *RedisStream) ensureConsumerGroup(ctx context.Context) error {
+	err := rs.rdb.XGroupCreateMkStream(ctx, PaymentSuccessStream, "backend-api", "0").Err()
+	if err != nil && !strings.Contains(err.Error(), "BUSYGROUP") {
+		return err
+	}
+	return nil
+}
+
 // isNoGroupError checks if the error is a NOGROUP error from Redis.
 func isNoGroupError(err error) bool {
 	return err != nil && strings.Contains(err.Error(), "NOGROUP")
