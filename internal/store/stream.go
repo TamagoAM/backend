@@ -13,6 +13,7 @@ import (
 const (
 	PaymentRequestStream = "stream:payment:request"
 	PaymentSuccessStream = "stream:payment:success"
+	EmailSendStream      = "stream:email:send"
 )
 
 // PaymentRequest is the message published to trigger the payment microservice.
@@ -35,6 +36,14 @@ type PaymentResult struct {
 	Status                string `json:"status"`
 	StripePaymentIntentID string `json:"stripe_payment_intent_id,omitempty"`
 	ErrorMessage          string `json:"error_message,omitempty"`
+}
+
+// EmailRequest is the message published to trigger the email microservice directly.
+type EmailRequest struct {
+	Template  string            `json:"template"`
+	ToAddress string            `json:"to_address"`
+	ToName    string            `json:"to_name"`
+	Payload   map[string]string `json:"payload"`
 }
 
 // RedisStream manages publishing payment requests and consuming results.
@@ -70,6 +79,20 @@ func (rs *RedisStream) PublishPaymentRequest(ctx context.Context, req PaymentReq
 	}
 	return rs.rdb.XAdd(ctx, &redis.XAddArgs{
 		Stream: PaymentRequestStream,
+		Values: map[string]interface{}{
+			"data": string(data),
+		},
+	}).Err()
+}
+
+// PublishEmailRequest publishes an email request directly to the email microservice stream.
+func (rs *RedisStream) PublishEmailRequest(ctx context.Context, req EmailRequest) error {
+	data, err := json.Marshal(req)
+	if err != nil {
+		return err
+	}
+	return rs.rdb.XAdd(ctx, &redis.XAddArgs{
+		Stream: EmailSendStream,
 		Values: map[string]interface{}{
 			"data": string(data),
 		},

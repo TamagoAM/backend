@@ -3426,6 +3426,75 @@ func NewSchema(db *sqlx.DB, notifs *notifications.Service, redisStream *storestr
 					return payment, nil
 				},
 			},
+
+			// ─── Email: send tama status report ───────────────────
+			"sendTamaStatusEmail": &graphql.Field{
+				Type:        graphql.Boolean,
+				Description: "Send the authenticated user's tama status as an email to the given address.",
+				Args: graphql.FieldConfigArgument{
+					"email": &graphql.ArgumentConfig{Type: graphql.NewNonNull(graphql.String)},
+				},
+				Resolve: func(p graphql.ResolveParams) (interface{}, error) {
+					claims, ok := p.Context.Value(auth.UserClaimsKey).(*auth.Claims)
+					if !ok || claims == nil {
+						return nil, fmt.Errorf("authentication required")
+					}
+					toEmail := p.Args["email"].(string)
+
+					user, err := store.GetUser(p.Context, claims.UserID)
+					if err != nil {
+						return nil, fmt.Errorf("user not found: %w", err)
+					}
+
+					tamas, err := store.TamasByUser(p.Context, claims.UserID)
+					if err != nil || len(tamas) == 0 {
+						return nil, fmt.Errorf("no tama found")
+					}
+					tama := tamas[0]
+
+					stats, err := store.TamaStatsByUser(p.Context, claims.UserID)
+					if err != nil || len(stats) == 0 {
+						return nil, fmt.Errorf("no tama stats found")
+					}
+					stat := stats[0]
+
+					happiness := (stat.SocialSatis + stat.WorkSatis + stat.PersonalSatis) / 3.0
+
+					status := "Alive"
+					if tama.DeathDay != nil {
+						status = "Dead"
+					}
+					sickness := ""
+					if tama.Sickness != nil {
+						sickness = *tama.Sickness
+					}
+
+					if redisStream != nil {
+						err = redisStream.PublishEmailRequest(p.Context, storestream.EmailRequest{
+							Template:  "tama_status",
+							ToAddress: toEmail,
+							ToName:    user.UserName,
+							Payload: map[string]string{
+								"user_name": user.UserName,
+								"tama_name": tama.Name,
+								"tama_race": tama.Race,
+								"status":    status,
+								"happiness": fmt.Sprintf("%.0f", happiness),
+								"hunger":    fmt.Sprintf("%.0f", float64(stat.Hunger)),
+								"hygiene":   fmt.Sprintf("%.0f", float64(stat.Hygiene)),
+								"boredom":   fmt.Sprintf("%.0f", float64(stat.Boredom)),
+								"money":     fmt.Sprintf("%.0f", float64(stat.Money)),
+								"sickness":  sickness,
+							},
+						})
+						if err != nil {
+							return nil, fmt.Errorf("failed to enqueue email: %w", err)
+						}
+					}
+
+					return true, nil
+				},
+			},
 		},
 	})
 

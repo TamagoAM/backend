@@ -111,7 +111,27 @@ func main() {
 		go redisStream.ConsumePaymentResults(ctx, func(result storestream.PaymentResult) {
 			log.Printf("[payment-result] payment #%d status=%s for user %d",
 				result.PaymentID, result.Status, result.UserID)
-			// Could apply item effects here if needed
+
+			// Update payment status in DB
+			_, dbErr := dbConn.ExecContext(ctx,
+				`UPDATE Payment SET Status = ? WHERE PaymentId = ?`,
+				result.Status, result.PaymentID)
+			if dbErr != nil {
+				log.Printf("[payment-result] failed to update payment status: %v", dbErr)
+			}
+
+			// Push notification to user
+			title := "Purchase successful! ✨"
+			body := "Your item is ready. A confirmation email is on its way."
+			notifType := notifications.NotifType("payment_success")
+			if result.Status != "success" {
+				title = "Purchase failed"
+				body = "Your payment could not be processed. Please try again."
+				notifType = notifications.NotifType("payment_failed")
+			}
+			if err := notifService.SendToUser(ctx, result.UserID, notifType, title, body, nil); err != nil {
+				log.Printf("[payment-result] failed to send push notification: %v", err)
+			}
 		})
 		log.Println("payment result consumer started")
 	}
